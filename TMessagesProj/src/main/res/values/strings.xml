@@ -11872,6 +11872,12 @@
     <string name="TelezhkaSaveRound">Сохранить кружок</string>
     <string name="TelezhkaSaveRoundFirst">Сначала посмотрите кружок, чтобы он скачался</string>
     <string name="TelezhkaVoiceFailed">Не получилось расшифровать голосовое. Попробуйте ещё раз.</string>
+    <string name="TelezhkaSendAsRound">Отправить кружком</string>
+    <string name="TelezhkaSendAsVoice">Отправить голосовым</string>
+    <string name="TelezhkaRoundTrimmed">Кружок длится до минуты, поэтому отправили первые 60 секунд</string>
+    <string name="TelezhkaRoundFailed">Не получилось сделать кружок из этого видео</string>
+    <string name="TelezhkaVoicePreparing">Готовим голосовое…</string>
+    <string name="TelezhkaVoiceConvertFailed">Не получилось сделать голосовое из этого файла</string>
     <string name="TelezhkaChannelName">Тележка · новости</string>
     <string name="TelezhkaChannelNew">новый канал</string>
     <string name="TelezhkaChannelTitle">Всё новое

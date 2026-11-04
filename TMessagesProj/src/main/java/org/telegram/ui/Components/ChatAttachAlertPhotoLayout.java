@@ -1847,6 +1847,20 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         });
     }
 
+    // Telezhka: after "Отправить кружком" — forget the selection like a sent selection, keeping camera files (they are being sent)
+    public void telezhkaForgetSelection() {
+        for (HashMap.Entry<Object, Object> entry : selectedPhotos.entrySet()) {
+            if (entry.getValue() instanceof MediaController.PhotoEntry) {
+                ((MediaController.PhotoEntry) entry.getValue()).reset();
+            }
+        }
+        selectedPhotos.clear();
+        selectedPhotosOrder.clear();
+        cameraPhotos.clear();
+        adapter.notifyDataSetChanged();
+        cameraAttachAdapter.notifyDataSetChanged();
+    }
+
     public void clearSelectedPhotos() {
         spoilerItem.setText(LocaleController.getString(R.string.EnablePhotoSpoiler));
         spoilerItem.setAnimatedIcon(R.raw.photo_spoiler);

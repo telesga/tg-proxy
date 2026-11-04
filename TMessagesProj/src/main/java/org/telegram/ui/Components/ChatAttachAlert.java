@@ -108,6 +108,7 @@ import org.telegram.messenger.MessageSuggestionParams;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.TelezhkaMediaAs;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
@@ -4035,6 +4036,58 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                         messageSendPreview = null;
                     }
                 });
+            }
+            // Telezhka: one video can go out as a round message, one audio file as a voice message
+            if (editingMessageObject == null && chatActivity != null) {
+                final ChatActivity telezhkaChat = chatActivity;
+                String roundPath = null;
+                VideoEditedInfo roundEdited = null;
+                String voicePath = null;
+                if ((currentAttachLayout == photoLayout || currentAttachLayout == photoPreviewLayout) && photoLayout != null && photoLayout.getSelectedPhotos().size() == 1) {
+                    Object only = photoLayout.getSelectedPhotos().values().iterator().next();
+                    if (only instanceof MediaController.PhotoEntry) {
+                        MediaController.PhotoEntry entry = (MediaController.PhotoEntry) only;
+                        if (entry.isVideo && !entry.isLivePhoto() && entry.path != null) {
+                            roundPath = entry.path;
+                            roundEdited = entry.editedInfo;
+                        }
+                    }
+                } else if (currentAttachLayout == audioLayout && messageObjects.size() == 1 && messageObjects.get(0).messageOwner != null) {
+                    voicePath = messageObjects.get(0).messageOwner.attachPath;
+                } else if (currentAttachLayout == documentLayout && documentLayout.selectedFilesOrder.size() == 1) {
+                    String file = documentLayout.selectedFilesOrder.get(0);
+                    if (TelezhkaMediaAs.isAudioPath(file)) {
+                        voicePath = file;
+                    } else if (TelezhkaMediaAs.isVideoPath(file)) {
+                        roundPath = file;
+                    }
+                }
+                if (roundPath != null && TelezhkaMediaAs.canSendRound(telezhkaChat)) {
+                    final String path = roundPath;
+                    final VideoEditedInfo edited = roundEdited;
+                    options.add(R.drawable.input_video, getString(R.string.TelezhkaSendAsRound), () -> {
+                        TelezhkaMediaAs.sendVideoAsRound(telezhkaChat, path, edited, true, 0);
+                        if (photoLayout != null && (currentAttachLayout == photoLayout || currentAttachLayout == photoPreviewLayout)) {
+                            photoLayout.telezhkaForgetSelection();
+                        }
+                        if (messageSendPreview != null) {
+                            messageSendPreview.dismiss(false);
+                            messageSendPreview = null;
+                        }
+                        dismiss(true);
+                    });
+                }
+                if (voicePath != null && TelezhkaMediaAs.canSendVoice(telezhkaChat)) {
+                    final String path = voicePath;
+                    options.add(R.drawable.input_mic, getString(R.string.TelezhkaSendAsVoice), () -> {
+                        TelezhkaMediaAs.sendAudioAsVoice(telezhkaChat, path, true, 0);
+                        if (messageSendPreview != null) {
+                            messageSendPreview.dismiss(false);
+                            messageSendPreview = null;
+                        }
+                        dismiss(true);
+                    });
+                }
             }
             if (editingMessageObject == null && canHaveStars && chatActivity != null && ChatObject.isChannelAndNotMegaGroup(chatActivity.getCurrentChat()) && chatActivity.getCurrentChatInfo() != null && chatActivity.getCurrentChatInfo().paid_media_allowed) {
                 ActionBarMenuSubItem item = options.add(R.drawable.menu_feature_paid, getString(R.string.PaidMediaButton), null).getLast();
