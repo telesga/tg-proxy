@@ -35948,6 +35948,28 @@ public class ChatActivity extends BaseFragment implements
         }, stars);
     }
 
+    // Telezhka: "Отправить кружком" — a gallery video already prepared as a round message by TelezhkaMediaAs
+    public void telezhkaSendRound(String path, VideoEditedInfo info, boolean notify, int scheduleDate) {
+        AlertsCreator.ensurePaidMessageConfirmation(currentAccount, getDialogId(), 1, payStars -> {
+            SendMessagesHelper.prepareSendingVideo(getAccountInstance(), path, info, null, null, dialog_id, replyingMessageObject, getThreadMessage(), null, replyingQuote, null, 0, null, notify, scheduleDate, 0, false, false, null, getMessageChatSendParams(), 0, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+            afterMessageSend();
+        });
+    }
+
+    // Telezhka: "Отправить голосовым" — an audio file re-encoded into a voice message by TelezhkaMediaAs
+    public void telezhkaSendVoice(TLRPC.TL_document document, String path, boolean notify, int scheduleDate) {
+        AlertsCreator.ensurePaidMessageConfirmation(currentAccount, getDialogId(), 1, payStars -> {
+            SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(document, null, path, dialog_id, replyingMessageObject, getThreadMessage(), null, null, null, null, notify, scheduleDate, 0, 0, null, null, false);
+            params.replyQuote = replyingQuote;
+            params.sendMessageChatArguments = getMessageChatSendParams();
+            params.payStars = payStars;
+            params.monoForumPeer = getSendMonoForumPeerId();
+            params.suggestionParams = getSendMessageSuggestionParams();
+            getSendMessagesHelper().sendMessage(params);
+            afterMessageSend();
+        });
+    }
+
     private void runCloseInstantCameraAnimation() {
         if (instantCameraView == null) {
             return;

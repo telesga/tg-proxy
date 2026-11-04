@@ -3,7 +3,8 @@ name: Build APK
 on:
   workflow_dispatch:
   push:
-    branches: [master, main]
+    # test: builds for trying things out, published as a pre-release that users never get (see the end)
+    branches: [master, main, test]
     paths-ignore:
       - '**.md'
       - 'proxies.json'
@@ -114,6 +115,10 @@ jobs:
         # "- " lines of the commit message become the list in the in-app update popup
         run: |
           {
+            if [ "${{ github.ref_name }}" = "test" ]; then
+              echo "Тестовая сборка из ветки test. Пользователям она не приходит: ни автообновлению, ни кнопке на сайте её не видно."
+              echo
+            fi
             echo "APK для установки на Android. Скачайте файл .apk ниже."
             echo
             git log -1 --format=%B | grep -E '^- ' | head -n 4 || true
@@ -138,6 +143,7 @@ jobs:
           path: out/*.apk
 
       - name: Publish release
+        if: github.ref_name != 'test'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
@@ -146,3 +152,18 @@ jobs:
           files: |
             out/*.apk
             out/update.json
+
+      # The test branch: a pre-release that is never "latest". The in-app updater and the site's
+      # download button read releases/latest, so users do not see it. No update.json, no Telezhka.apk.
+      - name: Publish test build
+        if: github.ref_name == 'test'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: Тест ${{ github.run_number }}
+          body_path: out/notes.md
+          prerelease: true
+          make_latest: false
+          files: |
+            out/Telezhka-${{ github.run_number }}.apk
