@@ -1,9 +1,14 @@
 [
-  {"server": "redflag.yazaebalsyadelatproxy.com", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
+  {"server": "dele89.quillmarsh.xyz", "port": 8443, "secret": "ee704c9352bad79b00f1e067772277715664726976652e676f6f676c652e636f6d"},
+  {"server": "zovi45.quietfjord.click", "port": 8443, "secret": "ee1237d7cf2d6a269469e3d9efdb771e3964726976652e676f6f676c652e636f6d"},
   {"server": "redflag.yazaebalsyadelatproxy.co.uk", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
-  {"server": "surf.suslik-cloud.com", "port": 443, "secret": "eed7f61466f824eafe116a533553e01bca737572662e7375736c696b2d636c6f75642e636f6d"},
+  {"server": "redflag.yazaebalsyadelatproxy.com", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
+  {"server": "visura62.larchmere.xyz", "port": 8443, "secret": "ee1b08e62ec79fffcec68f3209164b737d64726976652e676f6f676c652e636f6d"},
+  {"server": "rimi99.birchquay.xyz", "port": 8443, "secret": "eea208439f89c551765bdc3a874edb0cde64726976652e676f6f676c652e636f6d"},
   {"server": "as.mkim.click", "port": 443, "secret": "ee2dfa3526fc70b7abd7a09eade6ccea1f61732e6d6b696d2e636c69636b"},
   {"server": "max.kimt.click", "port": 443, "secret": "ee1b153cf06dbd43c6085c359a6702eb936d61782e6b696d742e636c69636b"},
+  {"server": "static.antenna-mzt.live", "port": 443, "secret": "ee5a42e3752e724f2fdae9c117e7f076fe73746f72652e737465616d706f77657265642e636f6d"},
+  {"server": "surf.suslik-cloud.com", "port": 443, "secret": "eed7f61466f824eafe116a533553e01bca737572662e7375736c696b2d636c6f75642e636f6d"},
   {"server": "zoto32.copperwren.click", "port": 8443, "secret": "ee3273480819998ba362f57567c6e689fe64726976652e676f6f676c652e636f6d"},
   {"server": "kane32.mosswren.vip", "port": 8443, "secret": "eeb2d71af96595ff01757060eac676054164726976652e676f6f676c652e636f6d"},
   {"server": "mari74.birchquay.xyz", "port": 8443, "secret": "ee4e5ae5f8da0208be46dae73a0fe764aa64726976652e676f6f676c652e636f6d"},
@@ -12,7 +17,6 @@
   {"server": "magaga67.mossharbor.xyz", "port": 8443, "secret": "ee28887325f2bb86770fa7caa8eb94c27264726976652e676f6f676c652e636f6d"},
   {"server": "mkima.davay.click", "port": 443, "secret": "ee39300be14c4d54704c92416d555fa7026d6b696d612e64617661792e636c69636b"},
   {"server": "ykima.davay.click", "port": 443, "secret": "ee06dfdbdf271bab18c6b606484c237384796b696d612e64617661792e636c69636b"},
-  {"server": "static.antenna-mzt.live", "port": 443, "secret": "ee5a42e3752e724f2fdae9c117e7f076fe73746f72652e737465616d706f77657265642e636f6d"},
   {"server": "z1.nevcodeframe.com", "port": 443, "secret": "eee5e0d75865263bccabe94c92f446184f7a312e6e6576636f64656672616d652e636f6d"},
   {"server": "tolega24.tidalbirch.sbs", "port": 8443, "secret": "ee38f8e53c0cf60d4bf9b30013c901cbb164726976652e676f6f676c652e636f6d"},
   {"server": "lemi92.foxglade.xyz", "port": 8443, "secret": "ee565b72dc9e3aa1acad6678adbf4160e564726976652e676f6f676c652e636f6d"},
@@ -24,6 +28,5 @@
   {"server": "raleto69.fernlark.xyz", "port": 443, "secret": "ee8ac4f89d6036e07f6ff9e00b1699819e72616c65746f36392e6665726e6c61726b2e78797a"},
   {"server": "ravira57.foxglade.xyz", "port": 443, "secret": "ee7cd4b962b2230b9a6f668711a9d8196572617669726135372e666f78676c6164652e78797a"},
   {"server": "pub.ultra-fast.cc", "port": 443, "secret": "ee74c51aade2b67faa2e6857113a07c3e17075622e756c7472612d666173742e6363"},
-  {"server": "fi.novitron.site", "port": 443, "secret": "eed8edb898a8f1cceb9ecc234ac83f2a337765622e6e6f766974726f6e2e73697465"},
-  {"server": "pub.ultra-fast.cc", "port": 443, "secret": "ee4d6e58f9e43779a5615f165cd3c6236a7075622e756c7472612d666173742e6363"}
+  {"server": "fi.novitron.site", "port": 443, "secret": "eed8edb898a8f1cceb9ecc234ac83f2a337765622e6e6f766974726f6e2e73697465"}
 ]
