@@ -11872,6 +11872,8 @@
     <string name="TelezhkaSaveRound">Сохранить кружок</string>
     <string name="TelezhkaSaveRoundFirst">Сначала посмотрите кружок, чтобы он скачался</string>
     <string name="TelezhkaVoiceFailed">Не получилось расшифровать голосовое. Попробуйте ещё раз.</string>
+    <string name="TelezhkaStatsTitle">Учитывать в статистике</string>
+    <string name="TelezhkaStatsInfo">Раз в день Тележка отмечается у своего бота, чтобы знать, сколько людей ей пользуется. Бот хранит только день, номер сборки и хэш аккаунта, без переписки</string>
     <string name="TelezhkaSendAsRound">Отправить кружком</string>
     <string name="TelezhkaSendAsVoice">Отправить голосовым</string>
     <string name="TelezhkaRoundTrimmed">Кружок длится до минуты, поэтому отправили первые 60 секунд</string>
