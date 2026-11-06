@@ -35,6 +35,7 @@ import org.telegram.messenger.TelezhkaAutoReply;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.TelezhkaPrivacy;
 import org.telegram.messenger.TelezhkaProxyAutopilot;
+import org.telegram.messenger.TelezhkaStats;
 import org.telegram.messenger.TelezhkaUpdater;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BackDrawable;
@@ -164,6 +165,19 @@ public class TelezhkaSettingsActivity extends BaseFragment {
         LinearLayout news = card(context);
         news.addView(linkRow(context, getString(R.string.TelezhkaNewsRow), "@" + BuildVars.NEWS_CHANNEL, () -> org.telegram.messenger.TelezhkaChannelPromo.showNow(this)));
         layout.addView(news, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
+
+        // Once a day the app tells the bot it is in use (TelezhkaStats); can be turned off
+        LinearLayout stats = card(context);
+        Switch statsSwitch = new Switch(context);
+        statsSwitch.setChecked(TelezhkaStats.isEnabled(), false);
+        LinearLayout statsRow = row(context, R.drawable.msg_stats, 0xFF6C8CFF, getString(R.string.TelezhkaStatsTitle), getString(R.string.TelezhkaStatsInfo), statsSwitch);
+        statsRow.setOnClickListener(v -> {
+            boolean now = !TelezhkaStats.isEnabled();
+            TelezhkaStats.setEnabled(now);
+            statsSwitch.setChecked(now, true);
+        });
+        stats.addView(statsRow);
+        layout.addView(stats, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
 
         updateStatus();
         updateTiles();
