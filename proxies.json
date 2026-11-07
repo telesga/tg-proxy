@@ -1,8 +1,11 @@
 [
-  {"server": "as.mkim.click", "port": 443, "secret": "ee2dfa3526fc70b7abd7a09eade6ccea1f61732e6d6b696d2e636c69636b"},
-  {"server": "max.kimt.click", "port": 443, "secret": "ee1b153cf06dbd43c6085c359a6702eb936d61782e6b696d742e636c69636b"},
   {"server": "redflag.yazaebalsyadelatproxy.co.uk", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
   {"server": "redflag.yazaebalsyadelatproxy.com", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
+  {"server": "dearly.netherus.com", "port": 443, "secret": "ee44cd74d18707cd8bb74920a99d445599646561726c792e6e657468657275732e636f6d"},
+  {"server": "lomile95.saltfern.xyz", "port": 8443, "secret": "eedb032c82e06131572d38ccd7c0fd7efe64726976652e676f6f676c652e636f6d"},
+  {"server": "loto39.copperwren.click", "port": 8443, "secret": "ee428e7782cb77f16adba1f4155e790cbb64726976652e676f6f676c652e636f6d"},
+  {"server": "as.mkim.click", "port": 443, "secret": "ee2dfa3526fc70b7abd7a09eade6ccea1f61732e6d6b696d2e636c69636b"},
+  {"server": "max.kimt.click", "port": 443, "secret": "ee1b153cf06dbd43c6085c359a6702eb936d61782e6b696d742e636c69636b"},
   {"server": "lomizo36.fernlark.xyz", "port": 8443, "secret": "ee75e4121a6e924021e299b009a9fa16f964726976652e676f6f676c652e636f6d"},
   {"server": "podevi72.quietfjord.click", "port": 8443, "secret": "ee414ab4ecc3b3ca728f2906bee91a7b2564726976652e676f6f676c652e636f6d"},
   {"server": "mkima.davay.click", "port": 443, "secret": "ee39300be14c4d54704c92416d555fa7026d6b696d612e64617661792e636c69636b"},
@@ -28,7 +31,5 @@
   {"server": "rile33.fernlark.xyz", "port": 8443, "secret": "eee2e4aa087800d8ad12ebf6dfeb4cc97172696c6533332e6665726e6c61726b2e78797a"},
   {"server": "redflag.yazaebalsyadelatproxy.uk", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
   {"server": "shared.ddproxy.xyz", "port": 443, "secret": "eedddddddddddddddddddddddddddddddd6d2e6265626f6f2e7275"},
-  {"server": "chestno.servera-dlya-tg-zdes-net.abrdns.com", "port": 443, "secret": "eea65c7fc5a0d5669ba371a7ca88fc19496f7a6f6e2e7275"},
-  {"server": "raleto69.fernlark.xyz", "port": 443, "secret": "ee8ac4f89d6036e07f6ff9e00b1699819e72616c65746f36392e6665726e6c61726b2e78797a"},
-  {"server": "ravira57.foxglade.xyz", "port": 443, "secret": "ee7cd4b962b2230b9a6f668711a9d8196572617669726135372e666f78676c6164652e78797a"}
+  {"server": "chestno.servera-dlya-tg-zdes-net.abrdns.com", "port": 443, "secret": "eea65c7fc5a0d5669ba371a7ca88fc19496f7a6f6e2e7275"}
 ]
