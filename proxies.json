@@ -1,6 +1,6 @@
 [
-  {"server": "redflag.yazaebalsyadelatproxy.co.uk", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
   {"server": "redflag.yazaebalsyadelatproxy.com", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
+  {"server": "redflag.yazaebalsyadelatproxy.co.uk", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
   {"server": "surf.suslik-cloud.com", "port": 443, "secret": "eed7f61466f824eafe116a533553e01bca737572662e7375736c696b2d636c6f75642e636f6d"},
   {"server": "demi53.mosswren.vip", "port": 8443, "secret": "ee1402ee8c5f34b02f36621ec9bd51535264726976652e676f6f676c652e636f6d"},
   {"server": "vimi54.birchquay.xyz", "port": 8443, "secret": "ee1240edc9b6d8d2fdc74ba265b1a3572b64726976652e676f6f676c652e636f6d"},
