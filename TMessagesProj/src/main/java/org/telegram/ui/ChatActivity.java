@@ -1712,6 +1712,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int charge_fee = 72;
 
     private final static int chat_menu_topic_create = 73;
+    private final static int telezhka_export = 90;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -3947,6 +3948,8 @@ public class ChatActivity extends BaseFragment implements
                     }
                 } else if (id == mute) {
                     toggleMute(false);
+                } else if (id == telezhka_export) {
+                    TelezhkaExportPopup.show(ChatActivity.this, dialog_id);
                 } else if (id == add_shortcut) {
                     try {
                         getMediaDataController().installShortcut(currentUser.id, MediaDataController.SHORTCUT_TYPE_USER_OR_CHAT);
@@ -4498,6 +4501,10 @@ public class ChatActivity extends BaseFragment implements
             }
             if (currentUser != null && currentUser.self && getDialogId() != UserObject.VERIFY) {
                 headerItem.lazilyAddSubItem(add_shortcut, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));
+            }
+            if (currentEncryptedChat == null && chatMode == MODE_DEFAULT && getDialogId() != UserObject.VERIFY) {
+                // Telezhka: the whole history as .html or .txt
+                headerItem.lazilyAddSubItem(telezhka_export, R.drawable.msg_download, getString(R.string.TelezhkaExportMenu));
             }
             if (!isTopic && !ChatObject.isMonoForum(currentChat)) {
                 clearHistoryItem = headerItem.lazilyAddSubItem(clear_history, R.drawable.msg_clear,

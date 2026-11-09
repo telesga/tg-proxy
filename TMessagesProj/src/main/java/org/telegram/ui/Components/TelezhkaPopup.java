@@ -41,11 +41,11 @@ import org.telegram.ui.ActionBar.Theme;
  */
 public class TelezhkaPopup extends Dialog {
 
-    private static final int PANEL = 0xFF1C1F28;
-    private static final int TEXT = 0xFFF2F3F6;
-    private static final int TEXT_2 = 0xFFC9CDD6;
-    private static final int MUTE = 0xFF8E95A4;
-    private static final int SIGNAL = 0xFFFF6B3D;
+    static final int PANEL = 0xFF1C1F28;
+    static final int TEXT = 0xFFF2F3F6;
+    static final int TEXT_2 = 0xFFC9CDD6;
+    static final int MUTE = 0xFF8E95A4;
+    static final int SIGNAL = 0xFFFF6B3D;
 
     private final FrameLayout container;
     private final LinearLayout card;
@@ -280,6 +280,37 @@ public class TelezhkaPopup extends Dialog {
         items.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
         return this;
     }
+
+    /** Any view under the points (option chips and such). */
+    public TelezhkaPopup addContent(View view) {
+        items.addView(view, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
+        return this;
+    }
+
+    /** Removes the points and added views, to show the next step in the same popup. */
+    public TelezhkaPopup clearItems() {
+        items.removeAllViews();
+        itemCount = 0;
+        return this;
+    }
+
+    /** A quiet button under the progress bar, e.g. to stop a long job. */
+    public TelezhkaPopup setProgressCancel(CharSequence text, View.OnClickListener listener) {
+        if (progressCancel == null) {
+            progressCancel = new TextView(getContext());
+            progressCancel.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            progressCancel.setTypeface(AndroidUtilities.bold());
+            progressCancel.setTextColor(MUTE);
+            progressCancel.setGravity(Gravity.CENTER);
+            progressCancel.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(14), 0, 0x14FFFFFF));
+            progressBox.addView(progressCancel, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 40, 0, 12, 0, 0));
+        }
+        progressCancel.setText(text);
+        progressCancel.setOnClickListener(listener);
+        return this;
+    }
+
+    private TextView progressCancel;
 
     /** A text field under the points, filled with {@code text}; the keyboard opens with it. */
     public EditTextBoldCursor addInput(CharSequence text, CharSequence hint) {
