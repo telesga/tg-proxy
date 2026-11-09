@@ -59,6 +59,8 @@ public class TelezhkaExportPopup {
     private int kind = TelezhkaExportWriter.KIND_PRIVATE;
     private boolean html = true;
     private int period = 0;
+    private boolean withMedia = false;
+    private boolean zip;
     private TelezhkaExport export;
     private File result;
     private float lastProgress;
@@ -103,6 +105,8 @@ public class TelezhkaExportPopup {
             periods[i] = getString(PERIOD_NAMES[i]);
         }
         popup.addContent(chips(periods, period, index -> period = index));
+        popup.addContent(label(getString(R.string.TelezhkaExportMedia)));
+        popup.addContent(chips(new String[]{getString(R.string.TelezhkaExportMediaOff), getString(R.string.TelezhkaExportMediaOn)}, withMedia ? 1 : 0, index -> withMedia = index == 1));
         popup.setMainButton(getString(R.string.TelezhkaExportStart), v -> start());
         popup.setSecondaryButton(getString(R.string.Cancel), v -> popup.dismiss());
         if (fragment.showDialog(popup, d -> {
@@ -127,7 +131,8 @@ public class TelezhkaExportPopup {
         popup.setProgressCancel(getString(R.string.TelezhkaExportCancel), v -> popup.dismiss());
 
         int since = PERIOD_DAYS[period] > 0 ? (int) (System.currentTimeMillis() / 1000) - PERIOD_DAYS[period] * 86400 : 0;
-        export = new TelezhkaExport(account, dialogId, title, kind, html, since, new TelezhkaExport.Listener() {
+        zip = false;
+        export = new TelezhkaExport(account, dialogId, title, kind, html, since, withMedia, new TelezhkaExport.Listener() {
             @Override
             public void onProgress(int loaded, float progress) {
                 lastProgress = Math.max(0, progress);
@@ -138,6 +143,43 @@ public class TelezhkaExportPopup {
             @Override
             public void onWait(int seconds) {
                 popup.setProgress(lastProgress, formatString(R.string.TelezhkaExportWait, seconds), "");
+            }
+
+            @Override
+            public void onConfirmMedia(int count, long bytes, boolean enoughSpace) {
+                popup.showProgress(false);
+                popup.clearItems();
+                popup.setTitleText(getString(R.string.TelezhkaExportMediaAsk));
+                popup.addDotItem(formatString(R.string.TelezhkaExportMediaAskInfo, count, AndroidUtilities.formatFileSize(bytes)));
+                if (enoughSpace) {
+                    popup.addDotItem(getString(R.string.TelezhkaExportMediaAskTraffic));
+                    popup.setMainButton(getString(R.string.TelezhkaExportMediaDownload), v -> resume(true));
+                } else {
+                    popup.addDotItem(getString(R.string.TelezhkaExportMediaNoSpace));
+                    popup.setMainButton(getString(R.string.TelezhkaExportMediaWithout), v -> resume(false));
+                }
+                popup.setSecondaryButton(getString(enoughSpace ? R.string.TelezhkaExportMediaWithout : R.string.TelezhkaExportCancel),
+                        v -> {
+                            if (enoughSpace) {
+                                resume(false);
+                            } else {
+                                popup.dismiss();
+                            }
+                        });
+            }
+
+            @Override
+            public void onMediaProgress(int done, int count, long bytesDone, long bytes) {
+                if (!zip) {
+                    popup.clearItems();
+                    popup.setTitleText(getString(R.string.TelezhkaExportMediaTitle));
+                    popup.addDotItem(getString(R.string.TelezhkaExportMediaInfo));
+                    popup.showProgress(true);
+                }
+                zip = true;
+                lastProgress = bytes > 0 ? Math.min(1f, bytesDone / (float) bytes) : (count > 0 ? done / (float) count : 1f);
+                popup.setProgress(lastProgress, formatString(R.string.TelezhkaExportMediaProgress, done, count),
+                        AndroidUtilities.formatFileSize(bytesDone) + " / " + AndroidUtilities.formatFileSize(bytes));
             }
 
             @Override
@@ -156,13 +198,24 @@ public class TelezhkaExportPopup {
         export.start();
     }
 
+    private void resume(boolean download) {
+        popup.clearItems();
+        popup.setTitleText(getString(download ? R.string.TelezhkaExportMediaTitle : R.string.TelezhkaExportLoadingTitle));
+        popup.addDotItem(getString(download ? R.string.TelezhkaExportMediaInfo : R.string.TelezhkaExportWriting));
+        popup.showProgress(true);
+        if (export != null) {
+            export.continueWithMedia(download);
+        }
+    }
+
     private void showDone(int count) {
         popup.showProgress(false);
         popup.setCancelableOutside(true);
         popup.clearItems();
         popup.setTitleText(getString(R.string.TelezhkaExportDone));
         popup.addDotItem(formatString(R.string.TelezhkaExportDoneInfo, TelezhkaExportWriter.messagesCount(count), AndroidUtilities.formatFileSize(result.length())));
-        popup.addDotItem(getString(html ? R.string.TelezhkaExportDoneHtml : R.string.TelezhkaExportDoneTxt));
+        boolean isZip = result.getName().endsWith(".zip");
+        popup.addDotItem(getString(isZip ? R.string.TelezhkaExportDoneZip : html ? R.string.TelezhkaExportDoneHtml : R.string.TelezhkaExportDoneTxt));
         popup.setMainButton(getString(R.string.TelezhkaExportShare), v -> share());
         popup.setSecondaryButton(getString(R.string.TelezhkaExportSave), v -> saveToDownloads());
     }
@@ -182,7 +235,7 @@ public class TelezhkaExportPopup {
             return;
         }
         Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType(html ? "text/html" : "text/plain");
+        intent.setType(mime());
         Uri uri;
         try {
             uri = FileProvider.getUriForFile(activity, ApplicationLoader.getApplicationId() + ".provider", result);
@@ -200,6 +253,10 @@ public class TelezhkaExportPopup {
         }
     }
 
+    private String mime() {
+        return result != null && result.getName().endsWith(".zip") ? "application/zip" : html ? "text/html" : "text/plain";
+    }
+
     private void saveToDownloads() {
         if (result == null || !result.exists()) {
             return;
@@ -211,7 +268,7 @@ public class TelezhkaExportPopup {
             return;
         }
         popup.dismiss();
-        MediaController.saveFile(result.getAbsolutePath(), activity, 2, result.getName(), html ? "text/html" : "text/plain", uri -> {
+        MediaController.saveFile(result.getAbsolutePath(), activity, 2, result.getName(), mime(), uri -> {
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contact_check, getString(R.string.TelezhkaExportSaved)).show();
         });
     }

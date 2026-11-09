@@ -38,6 +38,14 @@ public class TelezhkaExportWriter {
     public static final int SPAN_QUOTE = 9;
     public static final int SPAN_TAG = 10;       // hashtag, cashtag, bot command
 
+    public static final int MEDIA_FILE = 0;
+    public static final int MEDIA_PHOTO = 1;
+    public static final int MEDIA_VIDEO = 2;
+    public static final int MEDIA_ROUND = 3;
+    public static final int MEDIA_VOICE = 4;
+    public static final int MEDIA_AUDIO = 5;
+    public static final int MEDIA_GIF = 6;
+
     /** Formatting of a part of the text; start and end are UTF-16 offsets, like Telegram's entities. */
     public static class Span {
         public int type;
@@ -65,6 +73,9 @@ public class TelezhkaExportWriter {
         public String mediaIcon;     // an emoji
         public String media;         // "Фото", "Файл: отчёт.pdf · 1,2 МБ"
         public String mediaLink;     // optional: a map link for places
+        public String mediaFile;     // saved copy inside the archive, "media/123_photo.jpg"; null when not saved
+        public int mediaKind;        // MEDIA_*: how the saved copy is shown
+        public boolean mediaMissing; // it was meant to be saved but could not be downloaded
         public ArrayList<String> pollOptions;
         public int replyTo;
         public String forwardFrom;
@@ -186,7 +197,8 @@ public class TelezhkaExportWriter {
                         : "  ↪ в ответ на сообщение\n");
             }
             if (r.media != null) {
-                out.write("  [" + r.media + (r.mediaLink != null ? " " + r.mediaLink : "") + "]\n");
+                String where = r.mediaFile != null ? " → " + r.mediaFile : r.mediaMissing ? " (не скачалось)" : "";
+                out.write("  [" + r.media + (r.mediaLink != null ? " " + r.mediaLink : "") + where + "]\n");
             }
             if (r.pollOptions != null) {
                 for (String option : r.pollOptions) {
@@ -383,6 +395,22 @@ public class TelezhkaExportWriter {
         return false;
     }
 
+    // file names inside the archive may have spaces and Cyrillic letters
+    private static String fileUrl(String path) {
+        StringBuilder b = new StringBuilder();
+        for (String part : path.split("/")) {
+            if (b.length() > 0) {
+                b.append('/');
+            }
+            try {
+                b.append(java.net.URLEncoder.encode(part, "UTF-8").replace("+", "%20"));
+            } catch (Exception e) {
+                b.append(part);
+            }
+        }
+        return b.toString();
+    }
+
     private static String initial(String name) {
         if (name == null || name.trim().isEmpty()) {
             return "?";
@@ -450,10 +478,35 @@ public class TelezhkaExportWriter {
                     b.append("<div class=\"reply\"><span>Ответ на сообщение, которого нет в этом файле</span></div>");
                 }
             }
-            if (r.media != null) {
+            if (r.mediaFile != null) {
+                String src = esc(fileUrl(r.mediaFile));
+                switch (r.mediaKind) {
+                    case MEDIA_PHOTO:
+                        b.append("<a class=\"pic\" href=\"").append(src).append("\" target=\"_blank\"><img loading=\"lazy\" src=\"").append(src).append("\" alt=\"Фото\"></a>");
+                        break;
+                    case MEDIA_VIDEO:
+                        b.append("<video class=\"pic\" controls preload=\"metadata\" src=\"").append(src).append("\"></video>");
+                        break;
+                    case MEDIA_GIF:
+                        b.append("<video class=\"pic\" autoplay loop muted playsinline src=\"").append(src).append("\"></video>");
+                        break;
+                    case MEDIA_ROUND:
+                        b.append("<video class=\"round\" controls preload=\"metadata\" playsinline src=\"").append(src).append("\"></video>");
+                        break;
+                    case MEDIA_VOICE:
+                    case MEDIA_AUDIO:
+                        b.append("<div class=\"media\"><span class=\"ico\">").append(esc(r.mediaIcon != null ? r.mediaIcon : "🎵")).append("</span><span>")
+                                .append(esc(r.media)).append("</span></div><audio controls preload=\"none\" src=\"").append(src).append("\"></audio>");
+                        break;
+                    default:
+                        b.append("<a class=\"media\" href=\"").append(src).append("\" target=\"_blank\"><span class=\"ico\">")
+                                .append(esc(r.mediaIcon != null ? r.mediaIcon : "📎")).append("</span><span>").append(esc(r.media)).append("</span></a>");
+                }
+            } else if (r.media != null) {
+                String label = r.mediaMissing ? r.media + " · не скачалось" : r.media;
                 b.append(r.mediaLink != null ? "<a class=\"media\" target=\"_blank\" rel=\"noopener\" href=\"" + esc(safeUrl(r.mediaLink)) + "\">" : "<div class=\"media\">");
                 b.append("<span class=\"ico\">").append(esc(r.mediaIcon != null ? r.mediaIcon : "📎")).append("</span>");
-                b.append("<span>").append(esc(r.media)).append("</span>");
+                b.append("<span>").append(esc(label)).append("</span>");
                 b.append(r.mediaLink != null ? "</a>" : "</div>");
             }
             if (r.pollOptions != null && !r.pollOptions.isEmpty()) {
@@ -511,6 +564,9 @@ public class TelezhkaExportWriter {
             + ".reply b{display:block;font-weight:600}.reply span{display:block;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n"
             + ".media{display:flex;align-items:center;gap:8px;background:var(--line);border-radius:10px;padding:7px 10px;margin:3px 0;color:inherit;text-decoration:none;font-size:14px}\n"
             + ".media .ico{font-size:18px;line-height:1}\n"
+            + ".pic{display:block;max-width:100%;max-height:420px;border-radius:10px;margin:3px 0;background:var(--line)}.pic img{display:block;max-width:100%;max-height:420px;border-radius:10px}\n"
+            + ".round{display:block;width:220px;height:220px;border-radius:50%;object-fit:cover;margin:3px 0;background:var(--line)}\n"
+            + "audio{display:block;width:260px;max-width:100%;height:36px;margin:4px 0}\n"
             + ".poll{margin:4px 0;padding-left:20px}.poll li{margin:2px 0}\n"
             + ".text{white-space:normal}.text a{color:var(--link)}\n"
             + ".text pre{margin:4px 0;padding:8px;border-radius:8px;background:var(--line);overflow-x:auto;white-space:pre-wrap;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}\n"
