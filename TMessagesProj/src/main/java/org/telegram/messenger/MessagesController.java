@@ -19892,11 +19892,15 @@ public class MessagesController extends BaseController implements NotificationCe
                     final long did = editingMessages.keyAt(b);
                     for (MessageObject edited : editingMessages.valueAt(b)) {
                         final int mid = edited.getId();
-                        final String newText = edited.messageOwner.message;
+                        // with a local edit the object already shows the local text; Telegram's new text is the original
+                        final String localOriginal = TelezhkaLocalEdits.originalText(currentAccount, did, mid);
+                        final String newText = localOriginal != null ? localOriginal : edited.messageOwner.message;
                         getMessagesStorage().getStorageQueue().postRunnable(() -> {
                             TLRPC.Message old = getMessagesStorage().getMessageInternal(did, mid);
-                            if (old != null && old.message != null && !old.message.equals(newText)) {
-                                TelezhkaPrivacy.addVersion(currentAccount, did, mid, old.message, old.edit_date != 0 ? old.edit_date : old.date);
+                            // the stored text may be a local edit ("Изменить у себя"), which is not a real old version
+                            String oldText = old != null ? TelezhkaLocalEdits.realText(currentAccount, did, mid, old.message) : null;
+                            if (oldText != null && !oldText.equals(newText)) {
+                                TelezhkaPrivacy.addVersion(currentAccount, did, mid, oldText, old.edit_date != 0 ? old.edit_date : old.date);
                             }
                         });
                     }

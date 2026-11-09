@@ -3,7 +3,8 @@ name: Build APK
 on:
   workflow_dispatch:
   push:
-    # test: builds for trying things out, published as a pre-release that users never get (see the end)
+    # test: builds for trying things out. They go to a draft release that only the repo owner sees,
+    # do not take a release number and are never offered to users (see "Pick the build number" and the end).
     branches: [master, main, test]
     paths-ignore:
       - '**.md'
@@ -45,6 +46,35 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
 
+      # Release: previous release + 1, so test runs leave no gaps in the numbers people see.
+      # Test: the current release number (so the next release is still offered) plus the TELEZHKA_TEST flag.
+      - name: Pick the build number
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LATEST=$(gh api "repos/${{ github.repository }}/releases/latest" --jq '.tag_name' 2>/dev/null | sed -n -E 's/^build-([0-9]+)$/\1/p')
+          if [ "${{ github.ref_name }}" = "test" ]; then
+            BUILD=${LATEST:-0}
+            TAG="test-${{ github.run_id }}"
+            APK="Telezhka-test-${GITHUB_SHA::7}.apk"
+          else
+            if [ -n "$LATEST" ]; then
+              BUILD=$((LATEST + 1))
+            else
+              echo "::warning::Could not read the latest release, falling back to the run number"
+              BUILD=${{ github.run_number }}
+            fi
+            TAG="build-$BUILD"
+            APK="Telezhka-$BUILD.apk"
+          fi
+          {
+            echo "BUILD=$BUILD"
+            echo "TAG=$TAG"
+            echo "APK=$APK"
+            echo "SHORT_SHA=${GITHUB_SHA::7}"
+          } >> "$GITHUB_ENV"
+          echo "latest release: ${LATEST:-none}, this build: $BUILD, tag: $TAG, apk: $APK"
+
       - name: Insert API keys and proxy list URL
         env:
           API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -71,8 +101,11 @@ jobs:
             URL_ESCAPED=$(printf '%s' "$PROXY_LIST_URL" | sed 's/[&|]/\\&/g')
             sed -i -E "s|(public static String PROXY_LIST_URL = )\"[^\"]*\";|\1\"$URL_ESCAPED\";|" "$FILE"
           fi
-          sed -i -E "s/(public static int TELEZHKA_BUILD = )[0-9]+;/\1${{ github.run_number }};/" "$FILE"
-          grep -n "APP_ID =\|PROXY_LIST_URL =\|TELEZHKA_BUILD =" "$FILE"
+          sed -i -E "s/(public static int TELEZHKA_BUILD = )[0-9]+;/\1$BUILD;/" "$FILE"
+          if [ "${{ github.ref_name }}" = "test" ]; then
+            sed -i -E "s/(public static boolean TELEZHKA_TEST = )false;/\1true;/" "$FILE"
+          fi
+          grep -n "APP_ID =\|PROXY_LIST_URL =\|TELEZHKA_BUILD =\|TELEZHKA_TEST =" "$FILE"
 
       - name: Use own signing key
         env:
@@ -106,9 +139,11 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p out
-          cp "$(find TMessagesProj_App/build/outputs/apk -name '*.apk' | head -n 1)" out/Telezhka-${{ github.run_number }}.apk
-          # same file under a fixed name: the site links to releases/latest/download/Telezhka.apk
-          cp out/Telezhka-${{ github.run_number }}.apk out/Telezhka.apk
+          cp "$(find TMessagesProj_App/build/outputs/apk -name '*.apk' | head -n 1)" "out/$APK"
+          if [ "${{ github.ref_name }}" != "test" ]; then
+            # same file under a fixed name: the site links to releases/latest/download/Telezhka.apk
+            cp "out/$APK" out/Telezhka.apk
+          fi
           ls -la out
 
       - name: Release notes
@@ -116,7 +151,7 @@ jobs:
         run: |
           {
             if [ "${{ github.ref_name }}" = "test" ]; then
-              echo "Тестовая сборка из ветки test. Пользователям она не приходит: ни автообновлению, ни кнопке на сайте её не видно."
+              echo "Тестовая сборка из ветки test (коммит ${GITHUB_SHA::7}). Это черновик: его видите только вы, пользователям он не приходит."
               echo
             fi
             echo "APK для установки на Android. Скачайте файл .apk ниже."
@@ -124,9 +159,11 @@ jobs:
             git log -1 --format=%B | grep -E '^- ' | head -n 4 || true
           } > out/notes.md
           cat out/notes.md
+          if [ "${{ github.ref_name }}" = "test" ]; then
+            exit 0
+          fi
           # update.json for the in-app updater (read without the GitHub API rate limit)
-          APK="Telezhka-${{ github.run_number }}.apk"
-          python3 - "$APK" "${{ github.run_number }}" "${{ github.repository }}" <<'PY'
+          python3 - "$APK" "$BUILD" "${{ github.repository }}" <<'PY'
           import json, os, subprocess, sys
           apk, build, repo = sys.argv[1], int(sys.argv[2]), sys.argv[3]
           msg = subprocess.run(["git", "log", "-1", "--format=%B"], capture_output=True, text=True).stdout
@@ -137,7 +174,9 @@ jobs:
           print(data)
           PY
 
+      # Artifacts of a public repo can be downloaded by anyone signed in to GitHub, so test builds skip this.
       - uses: actions/upload-artifact@v4
+        if: github.ref_name != 'test'
         with:
           name: Telezhka-apk
           path: out/*.apk
@@ -146,24 +185,37 @@ jobs:
         if: github.ref_name != 'test'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: Сборка ${{ github.run_number }}
+          tag_name: ${{ env.TAG }}
+          name: Сборка ${{ env.BUILD }}
           body_path: out/notes.md
           files: |
             out/*.apk
             out/update.json
 
-      # The test branch: a pre-release that is never "latest". The in-app updater and the site's
-      # download button read releases/latest, so users do not see it. No update.json, no Telezhka.apk.
+      # The test branch: a draft release. Drafts are seen only by people with write access to the repo,
+      # releases/latest never returns them (so neither the in-app updater nor the site sees it),
+      # and it has no number. Download the APK from the Releases page while signed in to GitHub.
+      - name: Remove older test drafts
+        if: github.ref_name == 'test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" \
+            --jq '.[] | select(.draft and (.tag_name | startswith("test-"))) | .id' |
+          while read -r id; do
+            echo "Deleting old test draft $id"
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$id"
+          done
+
       - name: Publish test build
         if: github.ref_name == 'test'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: test-${{ github.run_number }}
+          tag_name: ${{ env.TAG }}
           target_commitish: ${{ github.sha }}
-          name: Тест ${{ github.run_number }}
+          name: Тестовая сборка · ${{ env.SHORT_SHA }}
           body_path: out/notes.md
-          prerelease: true
+          draft: true
           make_latest: false
           files: |
-            out/Telezhka-${{ github.run_number }}.apk
+            out/${{ env.APK }}

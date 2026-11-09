@@ -7,15 +7,21 @@
 package org.telegram.ui;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.LocaleController.formatString;
 import static org.telegram.messenger.LocaleController.getString;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -35,6 +41,7 @@ import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.TelezhkaAppearance;
+import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -44,15 +51,22 @@ import org.telegram.ui.Cells.ThemePreviewMessagesCell;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.Switch;
+import org.telegram.ui.Components.TelezhkaPopup;
+
+import java.util.ArrayList;
 
 /**
- * "Оформление Тележки": theme, app icon, message font, bubbles and what to hide, with a live chat preview on top.
+ * "Оформление Тележки": theme, app icon, message font (also the user's own .ttf/.otf files, which can be set
+ * for the whole app), bubbles and what to hide, with a live chat preview on top.
  * Colours come from the current theme, so the screen repaints itself when the theme changes.
  */
 public class TelezhkaAppearanceActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
     private static final int MIN_RADIUS = 0, MAX_RADIUS = 17;
     private static final int MIN_FONT = 12, MAX_FONT = 22;
+    private static final int REQUEST_FONT = 7310;
+
+    private boolean scrollToFonts;
 
     private ScrollView scrollView;
     private ThemePreviewMessagesCell preview;
@@ -178,23 +192,30 @@ public class TelezhkaAppearanceActivity extends BaseFragment implements Notifica
         layout.addView(card(context, iconsScroll));
         layout.addView(note(context, getString(R.string.TelezhkaIconInfo)));
 
-        // Message font
+        // Message font: built-in ones, the user's own files, and a chip to add one more
         layout.addView(header(context, getString(R.string.TelezhkaAppearanceFont)));
         HorizontalScrollView fontsScroll = new HorizontalScrollView(context);
         fontsScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout fonts = new LinearLayout(context);
         fonts.setOrientation(LinearLayout.HORIZONTAL);
         fonts.setPadding(dp(6), dp(4), dp(6), dp(4));
-        int font = TelezhkaAppearance.fontIndex();
+        String ownSelected = TelezhkaAppearance.selectedCustomFont();
+        ArrayList<TelezhkaAppearance.CustomFont> ownFonts = TelezhkaAppearance.customFonts();
+        String appFont = TelezhkaAppearance.appFontId();
+        boolean ownSelectedExists = false;
+        TelezhkaAppearance.CustomFont wholeAppCandidate = null;  // the font the "whole app" switch is about
+        for (TelezhkaAppearance.CustomFont own : ownFonts) {
+            if (own.id.equals(ownSelected)) {
+                ownSelectedExists = true;
+                wholeAppCandidate = own;
+            } else if (own.id.equals(appFont) && wholeAppCandidate == null) {
+                wholeAppCandidate = own;
+            }
+        }
+        int font = ownSelectedExists ? -1 : TelezhkaAppearance.fontIndex();
         for (int i = 0; i < TelezhkaAppearance.FONT_NAMES.length; i++) {
             final int index = i;
-            TextView chip = new TextView(context);
-            chip.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            chip.setText(getString(TelezhkaAppearance.FONT_NAMES[i]));
-            chip.setTypeface(TelezhkaAppearance.typeface(index));
-            chip.setTextColor(i == font ? onAccent() : text);
-            chip.setBackground(Theme.createRoundRectDrawable(dp(18), i == font ? accent : bg));
-            chip.setPadding(dp(14), dp(8), dp(14), dp(8));
+            TextView chip = fontChip(context, getString(TelezhkaAppearance.FONT_NAMES[i]), TelezhkaAppearance.typeface(index), i == font);
             chip.setOnClickListener(v -> {
                 TelezhkaAppearance.setFont(index);
                 relayoutPreview();
@@ -202,8 +223,64 @@ public class TelezhkaAppearanceActivity extends BaseFragment implements Notifica
             });
             fonts.addView(chip, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 8, 0));
         }
+        for (TelezhkaAppearance.CustomFont own : ownFonts) {
+            TextView chip = fontChip(context, own.name, TelezhkaAppearance.customTypeface(own.id), own.id.equals(ownSelected));
+            chip.setOnClickListener(v -> {
+                TelezhkaAppearance.setCustomFont(own.id);
+                relayoutPreview();
+                build(context);
+            });
+            chip.setOnLongClickListener(v -> {
+                askDeleteFont(context, own);
+                return true;
+            });
+            fonts.addView(chip, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 8, 0));
+        }
+        TextView add = new TextView(context);
+        add.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        add.setTypeface(AndroidUtilities.bold());
+        add.setText(getString(R.string.TelezhkaFontAdd));
+        add.setTextColor(accent);
+        GradientDrawable addBg = new GradientDrawable();
+        addBg.setCornerRadius(dp(18));
+        addBg.setStroke(dp(1.5f), accent);
+        add.setBackground(addBg);
+        add.setPadding(dp(14), dp(8), dp(14), dp(8));
+        add.setOnClickListener(v -> pickFont());
+        fonts.addView(add, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 8, 0));
         fontsScroll.addView(fonts);
-        layout.addView(card(context, fontsScroll));
+        View fontsCard;
+        if (wholeAppCandidate != null) {
+            // an own font is chosen for messages (or already set for the whole app): the switch for the whole app
+            final String candidateId = wholeAppCandidate.id;
+            LinearLayout fontBox = new LinearLayout(context);
+            fontBox.setOrientation(LinearLayout.VERTICAL);
+            fontBox.addView(fontsScroll);
+            fontBox.addView(toggle(context, formatString(R.string.TelezhkaFontWholeApp, wholeAppCandidate.name), getString(R.string.TelezhkaFontWholeAppInfo),
+                    candidateId.equals(appFont), on -> {
+                        TelezhkaAppearance.setAppFont(on ? candidateId : "");
+                        askRestart();
+                    }), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
+            fontsCard = card(context, fontBox);
+        } else {
+            fontsCard = card(context, fontsScroll);
+        }
+        layout.addView(fontsCard);
+        layout.addView(note(context, getString(ownFonts.isEmpty() ? R.string.TelezhkaFontOwnInfo : R.string.TelezhkaFontOwnInfoDelete)));
+        if (scrollToFonts) {
+            scrollToFonts = false;
+            scrollView.post(() -> {
+                int x = 0;
+                for (int i = 0; i < fonts.getChildCount(); i++) {
+                    View child = fonts.getChildAt(i);
+                    if (child.isSelected()) {
+                        x = child.getLeft() - dp(24);
+                    }
+                }
+                fontsScroll.smoothScrollTo(Math.max(0, x), 0);
+                scrollView.smoothScrollTo(0, Math.max(0, fontsCard.getTop() - dp(120)));
+            });
+        }
 
         // Bubbles
         layout.addView(header(context, getString(R.string.TelezhkaAppearanceBubbles)));
@@ -231,6 +308,125 @@ public class TelezhkaAppearanceActivity extends BaseFragment implements Notifica
         hide.addView(toggle(context, getString(R.string.TelezhkaHideCall), getString(R.string.TelezhkaHideCallInfo),
                 TelezhkaAppearance.hideCallButton(), TelezhkaAppearance::setHideCallButton));
         layout.addView(card(context, hide));
+    }
+
+    private TextView fontChip(Context context, String label, Typeface typeface, boolean selected) {
+        TextView chip = new TextView(context);
+        chip.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        chip.setText(label);
+        chip.setSingleLine(true);
+        chip.setEllipsize(TextUtils.TruncateAt.END);
+        chip.setMaxWidth(dp(180));
+        if (typeface != null) {
+            chip.setTypeface(typeface);
+        }
+        chip.setSelected(selected);
+        chip.setTextColor(selected ? onAccent() : text);
+        chip.setBackground(Theme.createRoundRectDrawable(dp(18), selected ? accent : bg));
+        chip.setPadding(dp(14), dp(8), dp(14), dp(8));
+        return chip;
+    }
+
+    private void pickFont() {
+        if (TelezhkaAppearance.customFonts().size() >= TelezhkaAppearance.MAX_CUSTOM_FONTS) {
+            BulletinFactory.of(this).createErrorBulletin(formatString(R.string.TelezhkaFontTooMany, TelezhkaAppearance.MAX_CUSTOM_FONTS)).show();
+            return;
+        }
+        // "*/*": most phones do not know the font MIME types and would grey the files out
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        try {
+            startActivityForResult(intent, REQUEST_FONT);
+        } catch (Exception e) {
+            BulletinFactory.of(this).createErrorBulletin(getString(R.string.TelezhkaFontNoPicker)).show();
+        }
+    }
+
+    @Override
+    public void onActivityResultFragment(int requestCode, int resultCode, Intent data) {
+        if (requestCode != REQUEST_FONT || resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
+            return;
+        }
+        Uri uri = data.getData();
+        Utilities.globalQueue.postRunnable(() -> {
+            int result = TelezhkaAppearance.importFont(uri);
+            String id = TelezhkaAppearance.lastImportedFont();
+            AndroidUtilities.runOnUIThread(() -> {
+                if (result == TelezhkaAppearance.IMPORT_OK) {
+                    TelezhkaAppearance.setCustomFont(id);
+                    relayoutPreview();
+                    scrollToFonts = true;
+                    if (fragmentView != null) {
+                        build(fragmentView.getContext());
+                    }
+                    BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, getString(R.string.TelezhkaFontAdded)).show();
+                } else {
+                    int error;
+                    switch (result) {
+                        case TelezhkaAppearance.IMPORT_NOT_A_FONT:
+                            error = R.string.TelezhkaFontNotAFont;
+                            break;
+                        case TelezhkaAppearance.IMPORT_TOO_BIG:
+                            error = R.string.TelezhkaFontTooBig;
+                            break;
+                        default:
+                            error = R.string.TelezhkaFontFailed;
+                            break;
+                    }
+                    BulletinFactory.of(this).createErrorBulletin(getString(error)).show();
+                }
+            });
+        });
+    }
+
+    private void askDeleteFont(Context context, TelezhkaAppearance.CustomFont font) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        TelezhkaPopup popup = new TelezhkaPopup(getParentActivity());
+        popup.setIcon(R.drawable.msg_delete).setTitleText(formatString(R.string.TelezhkaFontDeleteTitle, font.name));
+        popup.addDotItem(getString(R.string.TelezhkaFontDeleteInfo));
+        popup.setMainButton(getString(R.string.TelezhkaFontDelete), v -> {
+            popup.dismiss();
+            boolean wasAppFont = TelezhkaAppearance.deleteCustomFont(font.id);
+            relayoutPreview();
+            build(context);
+            if (wasAppFont) {
+                askRestart();
+            }
+        });
+        popup.setSecondaryButton(getString(R.string.Cancel), v -> popup.dismiss());
+        showDialog(popup);
+    }
+
+    // The whole-app font is picked up at start, so offer to restart right away
+    private void askRestart() {
+        if (getParentActivity() == null || !TelezhkaAppearance.appFontNeedsRestart()) {
+            return;
+        }
+        TelezhkaPopup popup = new TelezhkaPopup(getParentActivity());
+        popup.setIcon(R.drawable.msg_retry).setTitleText(getString(R.string.TelezhkaFontRestartTitle));
+        popup.addDotItem(getString(R.string.TelezhkaFontRestartInfo));
+        popup.setMainButton(getString(R.string.TelezhkaFontRestartNow), v -> {
+            popup.dismiss();
+            restartApp();
+        });
+        popup.setSecondaryButton(getString(R.string.TelezhkaFontRestartLater), v -> popup.dismiss());
+        showDialog(popup);
+    }
+
+    private void restartApp() {
+        Activity activity = getParentActivity();
+        if (activity == null) {
+            return;
+        }
+        Intent intent = activity.getPackageManager().getLaunchIntentForPackage(activity.getPackageName());
+        activity.finishAffinity();
+        if (intent != null) {
+            activity.startActivity(intent);
+        }
+        System.exit(0);
     }
 
     private void relayoutPreview() {

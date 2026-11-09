@@ -240,7 +240,7 @@ public class TelezhkaSettingsActivity extends BaseFragment {
         setTileInfo(hiddenTile, getString(TelezhkaHiddenChats.hasPin() ? R.string.TelezhkaPinIsSet : R.string.TelezhkaPinNotSet));
         setTileInfo(connectionTile, getString(TelezhkaProxyAutopilot.isEnabled() ? R.string.TelezhkaTileAuto : R.string.TelezhkaTileManual));
         setTileInfo(autoReplyRow, TelezhkaAutoReply.isEnabled() ? formatString(R.string.TelezhkaAutoReplyOn, TelezhkaAutoReply.answeredCount()) : getString(R.string.TelezhkaAutoReplyRowOff));
-        setTileInfo(updatesTile, BuildVars.TELEZHKA_BUILD > 0 ? formatString(R.string.TelezhkaTileBuild, BuildVars.TELEZHKA_BUILD) : getString(R.string.TelezhkaLocalBuildShort));
+        setTileInfo(updatesTile, BuildVars.TELEZHKA_BUILD > 0 && !BuildVars.TELEZHKA_TEST ? formatString(R.string.TelezhkaTileBuild, BuildVars.TELEZHKA_BUILD) : getString(R.string.TelezhkaLocalBuildShort));
     }
 
     // Hidden chats: no PIN yet -> create one; otherwise how to open them and changing the PIN

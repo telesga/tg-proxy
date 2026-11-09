@@ -164,6 +164,11 @@ public class TelezhkaPopup extends Dialog {
             window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             window.setDimAmount(0.6f);
+            if (hasInput) {
+                // the card moves up above the keyboard
+                window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+                window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE | WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+            }
         }
     }
 
@@ -275,6 +280,40 @@ public class TelezhkaPopup extends Dialog {
         items.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
         return this;
     }
+
+    /** A text field under the points, filled with {@code text}; the keyboard opens with it. */
+    public EditTextBoldCursor addInput(CharSequence text, CharSequence hint) {
+        EditTextBoldCursor input = new EditTextBoldCursor(getContext());
+        input.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        input.setTextColor(TEXT);
+        input.setHintText(hint);
+        input.setHintColor(MUTE);
+        input.setCursorColor(SIGNAL);
+        input.setCursorSize(dp(20));
+        input.setCursorWidth(1.5f);
+        input.setLineSpacing(dp(2), 1f);
+        input.setMinLines(2);
+        input.setMaxLines(8);
+        input.setVerticalScrollBarEnabled(true);
+        input.setGravity(Gravity.TOP | Gravity.LEFT);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        input.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        input.setBackground(Theme.createRoundRectDrawable(dp(16), 0x12FFFFFF));
+        input.setPadding(dp(14), dp(12), dp(14), dp(12));
+        if (text != null) {
+            input.setText(text);
+            input.setSelection(input.length());
+        }
+        items.addView(input, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 14, 0, 0));
+        hasInput = true;
+        setOnShowListener(d -> input.postDelayed(() -> {
+            input.requestFocus();
+            AndroidUtilities.showKeyboard(input);
+        }, 250));
+        return input;
+    }
+
+    private boolean hasInput;
 
     public TelezhkaPopup setMainButton(CharSequence text, View.OnClickListener listener) {
         mainButton.setText(text);

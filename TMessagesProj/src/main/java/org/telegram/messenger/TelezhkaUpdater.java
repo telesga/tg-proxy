@@ -35,7 +35,8 @@ import java.util.Locale;
 /**
  * Looks for a newer Telezhka build in the GitHub releases (at start and every 6 hours),
  * shows the update popup, downloads the APK inside the app and hands it to the Android installer.
- * Builds are numbered by the GitHub Actions run; BuildVars.TELEZHKA_BUILD is filled in by the workflow.
+ * Releases are numbered one after another (build-N); BuildVars.TELEZHKA_BUILD is filled in by the workflow.
+ * Test builds are draft releases, which releases/latest never returns, so they are never offered here.
  */
 public class TelezhkaUpdater {
 

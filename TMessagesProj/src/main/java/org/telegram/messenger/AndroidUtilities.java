@@ -264,6 +264,10 @@ public class AndroidUtilities {
     public static ThreadLocal<byte[]> bufferLocal = new ThreadLocal<>();
 
     public static Typeface bold() {
+        Typeface own = TelezhkaAppearance.appBoldTypeface();  // the user's own font for the whole app
+        if (own != null) {
+            return own;
+        }
         if (mediumTypeface == null) {
             if (SharedConfig.useSystemBoldFont && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 mediumTypeface = Typeface.create(null, 500, false);
@@ -278,21 +282,34 @@ public class AndroidUtilities {
     }
 
     public static Typeface regular() {
+        Typeface own = TelezhkaAppearance.appTypeface();
+        if (own != null) {
+            return own;
+        }
         Typeface typeface = getTypeface(TYPEFACE_TELEZHKA_REGULAR);
         return typeface != null ? typeface : Typeface.DEFAULT;
     }
 
     public static Typeface display() {
+        Typeface own = TelezhkaAppearance.appBoldTypeface();
+        if (own != null) {
+            return own;
+        }
         Typeface typeface = getTypeface(TYPEFACE_TELEZHKA_DISPLAY);
         return typeface != null ? typeface : bold();
     }
 
-    // Best effort: make Manrope the default for every view and paint that does not set its own typeface.
+    // Best effort: make Manrope (or the user's own font, if set for the whole app) the default for every view
+    // and paint that does not set its own typeface.
     // Uses hidden Typeface internals; anything the platform refuses is skipped and the system font stays.
     @SuppressWarnings("unchecked")
     public static void applyTelezhkaFonts() {
-        Typeface regular = getTypeface(TYPEFACE_TELEZHKA_REGULAR);
-        Typeface boldFace = getTypeface(TYPEFACE_TELEZHKA_BOLD);
+        Typeface regular = TelezhkaAppearance.appTypeface();
+        Typeface boldFace = TelezhkaAppearance.appBoldTypeface();
+        if (regular == null) {
+            regular = getTypeface(TYPEFACE_TELEZHKA_REGULAR);
+            boldFace = getTypeface(TYPEFACE_TELEZHKA_BOLD);
+        }
         if (regular == null) {
             return;
         }

@@ -1929,6 +1929,7 @@ public class MessageObject {
         if (message != null && message.noforwards && TelezhkaPrivacy.saveAll()) {
             message.noforwards = false;  // Telezhka "Скачивать всё": allow saving and copying
         }
+        TelezhkaLocalEdits.apply(accountNum, message);  // Telezhka "Изменить у себя": text changed on this phone only
         replyMessageObject = replyToMessage;
         eventId = eid;
         wasUnread = !messageOwner.out && messageOwner.unread;
