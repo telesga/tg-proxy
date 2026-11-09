@@ -138,6 +138,7 @@ import com.google.zxing.common.detector.MathUtils;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.TelezhkaAppearance;
+import org.telegram.messenger.TelezhkaLocalEdits;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
@@ -1269,6 +1270,8 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_SEND_MONEY = 117;
     public final static int OPTION_TELEZHKA_HISTORY = 1500;
     public final static int OPTION_TELEZHKA_SAVE_ROUND = 1501;
+    public final static int OPTION_TELEZHKA_LOCAL_EDIT = 1502;
+    public final static int OPTION_TELEZHKA_LOCAL_REVERT = 1503;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -1709,6 +1712,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int charge_fee = 72;
 
     private final static int chat_menu_topic_create = 73;
+    private final static int telezhka_export = 90;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -3944,6 +3948,8 @@ public class ChatActivity extends BaseFragment implements
                     }
                 } else if (id == mute) {
                     toggleMute(false);
+                } else if (id == telezhka_export) {
+                    TelezhkaExportPopup.show(ChatActivity.this, dialog_id);
                 } else if (id == add_shortcut) {
                     try {
                         getMediaDataController().installShortcut(currentUser.id, MediaDataController.SHORTCUT_TYPE_USER_OR_CHAT);
@@ -4495,6 +4501,10 @@ public class ChatActivity extends BaseFragment implements
             }
             if (currentUser != null && currentUser.self && getDialogId() != UserObject.VERIFY) {
                 headerItem.lazilyAddSubItem(add_shortcut, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));
+            }
+            if (currentEncryptedChat == null && chatMode == MODE_DEFAULT && getDialogId() != UserObject.VERIFY) {
+                // Telezhka: the whole history as .html or .txt
+                headerItem.lazilyAddSubItem(telezhka_export, R.drawable.msg_download, getString(R.string.TelezhkaExportMenu));
             }
             if (!isTopic && !ChatObject.isMonoForum(currentChat)) {
                 clearHistoryItem = headerItem.lazilyAddSubItem(clear_history, R.drawable.msg_clear,
@@ -33691,6 +33701,14 @@ public class ChatActivity extends BaseFragment implements
                 saveTelezhkaRound(selectedObject);
                 break;
             }
+            case OPTION_TELEZHKA_LOCAL_EDIT: {
+                showTelezhkaLocalEdit(telezhkaLocalEditTarget(selectedObject, selectedObjectGroup));
+                break;
+            }
+            case OPTION_TELEZHKA_LOCAL_REVERT: {
+                revertTelezhkaLocalEdit(telezhkaLocalEditTarget(selectedObject, selectedObjectGroup));
+                break;
+            }
             case OPTION_COPY: {
                 final TL_iv.RichMessage copyRichMessage = selectedObject.messageOwner != null ? selectedObject.messageOwner.rich_message : null;
                 if (selectedObject.isDice()) {
@@ -46796,6 +46814,93 @@ public class ChatActivity extends BaseFragment implements
             options.add(OPTION_TELEZHKA_SAVE_ROUND);
             icons.add(R.drawable.msg_gallery);
         }
+        // Telezhka: change the text only on this phone, and bring the original back
+        MessageObject localTarget = telezhkaLocalEditTarget(message, groupedMessages);
+        if (canTelezhkaLocalEdit(localTarget)) {
+            items.add(getString(R.string.TelezhkaLocalEdit));
+            options.add(OPTION_TELEZHKA_LOCAL_EDIT);
+            icons.add(R.drawable.msg_text_outlined);
+            if (TelezhkaLocalEdits.has(currentAccount, localTarget)) {
+                items.add(getString(R.string.TelezhkaLocalEditRevert));
+                options.add(OPTION_TELEZHKA_LOCAL_REVERT);
+                icons.add(R.drawable.msg_reset);
+            }
+        }
+    }
+
+    // In an album the caption sits on one of the messages; edit that one
+    private MessageObject telezhkaLocalEditTarget(MessageObject message, MessageObject.GroupedMessages group) {
+        if (message == null || group == null || group.messages.isEmpty()) {
+            return message;
+        }
+        for (MessageObject item : group.messages) {
+            if (item.messageOwner != null && !TextUtils.isEmpty(item.messageOwner.message)) {
+                return item;
+            }
+        }
+        return message;
+    }
+
+    private boolean canTelezhkaLocalEdit(MessageObject message) {
+        if (message == null || message.messageOwner == null || message.getId() <= 0 || chatMode == MODE_SCHEDULED) {
+            return false;
+        }
+        if (message.messageOwner instanceof TLRPC.TL_messageService || message.isSponsored() || message.messageOwner.rich_message != null) {
+            return false;
+        }
+        switch (message.type) {
+            case MessageObject.TYPE_TEXT:
+            case MessageObject.TYPE_PHOTO:
+            case MessageObject.TYPE_VOICE:
+            case MessageObject.TYPE_VIDEO:
+            case MessageObject.TYPE_GIF:
+            case MessageObject.TYPE_FILE:
+            case MessageObject.TYPE_MUSIC:
+                return !message.isDice();
+            default:
+                return false;
+        }
+    }
+
+    private void showTelezhkaLocalEdit(MessageObject message) {
+        if (!canTelezhkaLocalEdit(message) || getParentActivity() == null) {
+            return;
+        }
+        boolean textOnly = message.type == MessageObject.TYPE_TEXT;
+        TelezhkaPopup popup = new TelezhkaPopup(getParentActivity());
+        popup.setIcon(R.drawable.msg_text_outlined).setTitleText(getString(R.string.TelezhkaLocalEdit));
+        popup.addDotItem(getString(R.string.TelezhkaLocalEditInfo));
+        EditTextBoldCursor input = popup.addInput(message.messageOwner.message, getString(textOnly ? R.string.TelezhkaLocalEditHint : R.string.TelezhkaLocalEditCaptionHint));
+        popup.setMainButton(getString(R.string.TelezhkaLocalEditSave), v -> {
+            String text = input.getText() == null ? "" : input.getText().toString();
+            if (textOnly && text.trim().isEmpty()) {
+                AndroidUtilities.shakeViewSpring(input, -6);
+                BotWebViewVibrationEffect.APP_ERROR.vibrate();
+                return;
+            }
+            AndroidUtilities.hideKeyboard(input);
+            popup.dismiss();
+            boolean wasEdited = TelezhkaLocalEdits.has(currentAccount, message);
+            TelezhkaLocalEdits.set(currentAccount, message, text);
+            // setting the original text back is the same as "Вернуть как было", and then the database gets it too
+            boolean reverted = wasEdited && !TelezhkaLocalEdits.has(currentAccount, message);
+            TelezhkaLocalEdits.refresh(currentAccount, message, reverted);
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check,
+                    getString(reverted ? R.string.TelezhkaLocalEditReverted : R.string.TelezhkaLocalEditDone)).show();
+        });
+        popup.setSecondaryButton(getString(R.string.Cancel), v -> {
+            AndroidUtilities.hideKeyboard(input);
+            popup.dismiss();
+        });
+        showDialog(popup);
+    }
+
+    private void revertTelezhkaLocalEdit(MessageObject message) {
+        if (message == null || !TelezhkaLocalEdits.revert(currentAccount, message)) {
+            return;
+        }
+        TelezhkaLocalEdits.refresh(currentAccount, message, true);
+        BulletinFactory.of(this).createSimpleBulletin(R.raw.contact_check, getString(R.string.TelezhkaLocalEditReverted)).show();
     }
 
     private void showTelezhkaEditHistory(MessageObject message) {
@@ -46809,8 +46914,12 @@ public class ChatActivity extends BaseFragment implements
             long date = Long.parseLong(version[1]) * 1000L;
             popup.addDotItem("**" + LocaleController.getInstance().getFormatterDay().format(date) + "** " + version[0]);
         }
-        if (message.messageOwner != null && !TextUtils.isEmpty(message.messageOwner.message)) {
-            popup.addDotItem("**" + getString(R.string.TelezhkaEditNow) + "** " + message.messageOwner.message);
+        String now = TelezhkaLocalEdits.originalText(currentAccount, message.getDialogId(), message.getId());
+        if (now == null && message.messageOwner != null) {
+            now = message.messageOwner.message;
+        }
+        if (!TextUtils.isEmpty(now)) {
+            popup.addDotItem("**" + getString(R.string.TelezhkaEditNow) + "** " + now);
         }
         popup.setMainButton(getString(R.string.OK), v -> popup.dismiss());
         showDialog(popup);

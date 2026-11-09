@@ -71,8 +71,8 @@ public class TelezhkaStats {
 
     /** The chat list was opened: say "hi" if it has not been said today. */
     public static void ping() {
-        if (BuildVars.TELEZHKA_BUILD <= 0 || sending || !isEnabled()) {
-            return;  // local builds are not counted
+        if (BuildVars.TELEZHKA_BUILD <= 0 || BuildVars.TELEZHKA_TEST || sending || !isEnabled()) {
+            return;  // local and test builds are not counted
         }
         String today = today();
         if (today.equals(prefs().getString(KEY_LAST_DAY, ""))) {

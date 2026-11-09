@@ -33,9 +33,12 @@ public class BuildVars {
     // Tried in order until one gives proxies: the address set in the app (Подключение → Источник списка),
     // then PROXY_LIST_URL (proxies.json in the GitHub repo), then the mirrors.
     public static String PROXY_LIST_URL = "https://raw.githubusercontent.com/telesga/tg-proxy/main/proxies.json";
-    // Telezhka updates come from this repo's releases; TELEZHKA_BUILD is set to the Actions run number by the workflow
+    // Telezhka updates come from this repo's releases. The workflow sets TELEZHKA_BUILD: for a release it is the
+    // previous release + 1; for a build from the test branch it is the current release and TELEZHKA_TEST is true,
+    // so a test build calls itself "Тестовая сборка", is not counted, and still gets offered the next release.
     public static String GITHUB_REPO = "telesga/tg-proxy";
     public static int TELEZHKA_BUILD = 0;
+    public static boolean TELEZHKA_TEST = false;
     // Music bot behind the "Музыка" screen (see app_api.py in the bot)
     public static String MUSIC_BOT_USERNAME = "naidi_trek_bot";
     public static long MUSIC_BOT_ID = 8815255287L;
