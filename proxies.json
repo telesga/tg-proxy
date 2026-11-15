@@ -1,12 +1,16 @@
 [
-  {"server": "surf.suslik-cloud.com", "port": 443, "secret": "eed7f61466f824eafe116a533553e01bca737572662e7375736c696b2d636c6f75642e636f6d"},
   {"server": "t3.myrka.digital", "port": 444, "secret": "ee8888777766665555444433332222111174332e6d79726b612e6469676974616c"},
+  {"server": "kvas.kemerovo.online", "port": 8443, "secret": "ee888877776666555544443333222211117474322e6d79726b612e6469676974616c"},
+  {"server": "irl.firemedia.digital", "port": 443, "secret": "eeadd144b0531c1a9f5947e3cb29dc4fd569726c2e666972656d656469612e6469676974616c"},
+  {"server": "t4.myrka.digital", "port": 443, "secret": "ee1111222233334444555566667777888874342e6d79726b612e6469676974616c"},
+  {"server": "awd.subaru-volga.com", "port": 443, "secret": "ee54701e1686de96a44721501a7bee9e4c6c796e657474652e6d79726b612e6469676974616c"},
+  {"server": "redflag.yazaebalsyadelatproxy.com", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
+  {"server": "redflag.yazaebalsyadelatproxy.uk", "port": 443, "secret": "ee69e899d89ec68e220ca177557322b27f726564666c61672e79617a616562616c73796164656c617470726f78792e6363"},
   {"server": "barsik.subaru-volga.com", "port": 443, "secret": "ee04daa35f7150d1d16c43f270c26831086a61726b6f2e6d79726b612e6469676974616c"},
+  {"server": "surf.suslik-cloud.com", "port": 443, "secret": "eed7f61466f824eafe116a533553e01bca737572662e7375736c696b2d636c6f75642e636f6d"},
   {"server": "kima.rabotaet.online", "port": 443, "secret": "ee12e7e5f961f258b04af168a1cba6318a6b696d612e7261626f746165742e6f6e6c696e65"},
   {"server": "max.kimt.click", "port": 443, "secret": "ee1b153cf06dbd43c6085c359a6702eb936d61782e6b696d742e636c69636b"},
   {"server": "4x4.subaru-volga.com", "port": 443, "secret": "ee54701e1686de96a44721501a7bee9e4c6c796e657474652e6d79726b612e6469676974616c"},
-  {"server": "awd.subaru-volga.com", "port": 443, "secret": "ee54701e1686de96a44721501a7bee9e4c6c796e657474652e6d79726b612e6469676974616c"},
-  {"server": "irl.firemedia.digital", "port": 443, "secret": "eeadd144b0531c1a9f5947e3cb29dc4fd569726c2e666972656d656469612e6469676974616c"},
   {"server": "lynette.myrka.digital", "port": 443, "secret": "ee54701e1686de96a44721501a7bee9e4c6c796e657474652e6d79726b612e6469676974616c"},
   {"server": "static.antenna-mzt.live", "port": 443, "secret": "ee5a42e3752e724f2fdae9c117e7f076fe73746f72652e737465616d706f77657265642e636f6d"},
   {"server": "ganemi87.tidelark.cc", "port": 8443, "secret": "eedc3799b42ede3b50888183dcda40d67064726976652e676f6f676c652e636f6d"},
@@ -31,7 +35,6 @@
   {"server": "awd.subaru-volga.com", "port": 443, "secret": "ee1111222233334444555566667777888874342e6d79726b612e6469676974616c"},
   {"server": "tomasu22.fernlark.xyz", "port": 8443, "secret": "eee279647020eebfa18cc77b516b7bfd85786170692e6f7a6f6e2e7275"},
   {"server": "lonezo26.saltfern.xyz", "port": 8443, "secret": "eeec569fca8169b57457c573b55bbaa8ec706574726f766963682e7275"},
-  {"server": "t4.myrka.digital", "port": 443, "secret": "ee1111222233334444555566667777888874342e6d79726b612e6469676974616c"},
   {"server": "ririny44.tidelark.cc", "port": 8443, "secret": "ee908a3490ac6759588ba515fac7ff5099706574726f766963682e7275"},
   {"server": "lene98.mossharbor.xyz", "port": 8443, "secret": "eeee11eba813b57526bbb2594bae8959e7786170692e6f7a6f6e2e7275"},
   {"server": "mt1.leeroy.uz", "port": 443, "secret": "eede199cd5cc7674e522ef10f4359224d36d2e6265626f6f2e7275"},
@@ -49,9 +52,5 @@
   {"server": "nymika69.mosswren.vip", "port": 8443, "secret": "ee219dc1aaf0a73a3838af26cd2f6245ee64726976652e676f6f676c652e636f6d"},
   {"server": "mikany52.quietfjord.click", "port": 8443, "secret": "ee58eea2e9626dda2c236cb4c85308a1ca64726976652e676f6f676c652e636f6d"},
   {"server": "deneny63.copperwren.click", "port": 8443, "secret": "eea0ff0ea774477bc344bd600702f4aea964726976652e676f6f676c652e636f6d"},
-  {"server": "sukapo16.foxglade.xyz", "port": 8443, "secret": "ee0fde41eb62ad6ce7e55c5d018a87732e64726976652e676f6f676c652e636f6d"},
-  {"server": "deto84.larchmere.xyz", "port": 8443, "secret": "ee3295597e6c795e6a1a4b0a1231aec82164726976652e676f6f676c652e636f6d"},
-  {"server": "razora52.fernlark.xyz", "port": 8443, "secret": "ee88520a4798e086857d87fd444d0b4ab464726976652e676f6f676c652e636f6d"},
-  {"server": "garazo91.birchquay.xyz", "port": 8443, "secret": "ee603576a34f4df9f5a5668a3c1723de5964726976652e676f6f676c652e636f6d"},
-  {"server": "lori58.quillmarsh.xyz", "port": 8443, "secret": "eed55fb51ca705b72784df27f1fbe1619164726976652e676f6f676c652e636f6d"}
+  {"server": "sukapo16.foxglade.xyz", "port": 8443, "secret": "ee0fde41eb62ad6ce7e55c5d018a87732e64726976652e676f6f676c652e636f6d"}
 ]
