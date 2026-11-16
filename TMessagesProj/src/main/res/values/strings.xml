@@ -12021,4 +12021,17 @@
     <string name="TelezhkaChannelFeature2Info">Список обновляется каждые полчаса</string>
     <string name="TelezhkaChannelFeature3">Удалённые не пропадают</string>
     <string name="TelezhkaChannelFeature3Info">Включается в настройках Тележки</string>
+    <string name="TelezhkaInfoId">ID</string>
+    <string name="TelezhkaInfoIdCopied">ID скопирован</string>
+    <string name="TelezhkaInfoRegistered">Дата регистрации</string>
+    <string name="TelezhkaInfoRegisteredApprox">Дата регистрации (оценка по ID)</string>
+    <string name="TelezhkaInfoCreated">Дата создания</string>
+    <string name="TelezhkaInfoDc">Дата-центр</string>
+    <string name="TelezhkaInfoApprox">≈ %1$s</string>
+    <string name="TelezhkaInfoLoading">Загружаю…</string>
+    <string name="TelezhkaInfoUnknown">неизвестно</string>
+    <string name="TelezhkaInfoDcMiami">Майами</string>
+    <string name="TelezhkaInfoDcAmsterdam">Амстердам</string>
+    <string name="TelezhkaInfoDcSingapore">Сингапур</string>
+    <string name="TelezhkaInfoCopied">Скопировано</string>
 </resources>

@@ -134,6 +134,7 @@ import androidx.viewpager.widget.ViewPager;
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.TelezhkaPeerInfo;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.AuthTokensHelper;
 import org.telegram.messenger.BillingController;
@@ -644,6 +645,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int dataRow;
     private int chatRow;
     private int telezhkaRow;
+    // Telezhka: ID, registration/creation date and data center at the end of the info block
+    private int telezhkaIdRow, telezhkaDateRow, telezhkaDcRow;
     private int filtersRow;
     private int liteModeRow;
     private int stickersRow;
@@ -4637,6 +4640,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
             } else if (position == noteRow) {
                 editNotes(view, position);
+            } else if (position == telezhkaIdRow || position == telezhkaDateRow || position == telezhkaDcRow) {
+                copyTelezhkaInfo(position);
             } else {
                 processOnClickOrPress(position, view, x, y);
             }
@@ -5022,6 +5027,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     return true;
                 } else if (position == noteRow) {
                     editNotes(view, position);
+                    return true;
+                } else if (position == telezhkaIdRow || position == telezhkaDateRow || position == telezhkaDcRow) {
+                    copyTelezhkaInfo(position);
                     return true;
                 } else {
                     if (editRow(view, position)) return true;
@@ -7435,6 +7443,52 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             }
         });
         presentFragment(fragment);
+    }
+
+    // Telezhka: the ID / registration date / data center rows
+    private void bindTelezhkaInfo(TextDetailCell cell, int position) {
+        final TLRPC.User user = userId != 0 ? getMessagesController().getUser(userId) : null;
+        final TLRPC.Chat chat = user == null && chatId != 0 ? getMessagesController().getChat(chatId) : null;
+        if (position == telezhkaIdRow) {
+            cell.setTextAndValue(TelezhkaPeerInfo.formatId(user, chat), getString(R.string.TelezhkaInfoId), false);
+        } else if (position == telezhkaDateRow) {
+            final TelezhkaPeerInfo.Date date = TelezhkaPeerInfo.getDate(currentAccount, user, userInfo, chat, () -> {
+                if (listAdapter != null && telezhkaDateRow >= 0) {
+                    listAdapter.notifyItemChanged(telezhkaDateRow);
+                }
+            });
+            final int label;
+            if (user == null) {
+                label = R.string.TelezhkaInfoCreated;
+            } else if (date.kind == TelezhkaPeerInfo.DATE_APPROX) {
+                label = R.string.TelezhkaInfoRegisteredApprox;
+            } else {
+                label = R.string.TelezhkaInfoRegistered;
+            }
+            cell.setTextAndValue(TelezhkaPeerInfo.formatDate(date), getString(label), false);
+        } else {
+            final int dc = TelezhkaPeerInfo.getDc(currentAccount, user, userInfo, chat);
+            cell.setTextAndValue(TelezhkaPeerInfo.formatDc(dc), getString(R.string.TelezhkaInfoDc), false);
+        }
+        cell.setContentDescriptionValueFirst(true);
+    }
+
+    private void copyTelezhkaInfo(int position) {
+        final TLRPC.User user = userId != 0 ? getMessagesController().getUser(userId) : null;
+        final TLRPC.Chat chat = user == null && chatId != 0 ? getMessagesController().getChat(chatId) : null;
+        final String text;
+        if (position == telezhkaIdRow) {
+            text = TelezhkaPeerInfo.formatId(user, chat);
+        } else if (position == telezhkaDateRow) {
+            text = TelezhkaPeerInfo.formatDate(TelezhkaPeerInfo.getDate(currentAccount, user, userInfo, chat, null));
+        } else {
+            text = TelezhkaPeerInfo.formatDc(TelezhkaPeerInfo.getDc(currentAccount, user, userInfo, chat));
+        }
+        if (TextUtils.isEmpty(text)) {
+            return;
+        }
+        AndroidUtilities.addToClipboard(text);
+        BulletinFactory.of(this).createCopyBulletin(getString(position == telezhkaIdRow ? R.string.TelezhkaInfoIdCopied : R.string.TelezhkaInfoCopied), resourcesProvider).show();
     }
 
     private boolean processOnClickOrPress(final int position, final View view, final float x, final float y) {
@@ -10845,6 +10899,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         dataRow = -1;
         chatRow = -1;
         telezhkaRow = -1;
+        telezhkaIdRow = -1;
+        telezhkaDateRow = -1;
+        telezhkaDcRow = -1;
         filtersRow = -1;
         liteModeRow = -1;
         stickersRow = -1;
@@ -11097,6 +11154,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         noteRow = rowCount++;
                     }
                 }
+                if (user != null) {
+                    telezhkaIdRow = rowCount++;
+                    telezhkaDateRow = rowCount++;
+                    telezhkaDcRow = rowCount++;
+                }
                 if (actionsView == null && userId != getUserConfig().getClientUserId()) {
                     notificationsRow = rowCount++;
                 }
@@ -11249,8 +11311,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     emptyRow = rowCount++;
                 }
             }
+            if (currentChat != null) {
+                telezhkaIdRow = rowCount++;
+                telezhkaDateRow = rowCount++;
+                telezhkaDcRow = rowCount++;
+            }
             if (actionsView == null) {
-                if (infoHeaderRow != -1) {
+                if (infoHeaderRow != -1 || telezhkaIdRow != -1) {
                     notificationsDividerRow = rowCount++;
                 }
                 notificationsRow = rowCount++;
@@ -13751,6 +13818,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             usernames = new ArrayList<>();
                         }
                         detailCell.setTextAndValue(text, alsoUsernamesString(username, usernames, value), infoEndRowEmpty == -1 && (isTopic || bizHoursRow != -1 || bizLocationRow != -1) && birthdayRow < 0);
+                    } else if (position == telezhkaIdRow || position == telezhkaDateRow || position == telezhkaDcRow) {
+                        bindTelezhkaInfo(detailCell, position);
                     } else if (position == locationRow) {
                         if (chatInfo != null && chatInfo.location instanceof TLRPC.TL_channelLocation) {
                             TLRPC.TL_channelLocation location = (TLRPC.TL_channelLocation) chatInfo.location;
@@ -14468,7 +14537,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         position == clearLogsRow || position == switchBackendRow || position == setAvatarRow ||
                         position == addToGroupButtonRow || position == premiumRow || position == premiumGiftingRow ||
                         position == businessRow || position == liteModeRow || position == birthdayRow || position == channelRow ||
-                        position == starsRow || position == tonRow || position == linkedCommunityRow;
+                        position == starsRow || position == tonRow || position == linkedCommunityRow ||
+                        position == telezhkaIdRow || position == telezhkaDateRow || position == telezhkaDcRow;
             }
             if (holder.itemView instanceof UserCell) {
                 UserCell userCell = (UserCell) holder.itemView;
@@ -14496,7 +14566,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (position == infoHeaderRow || position == membersHeaderRow || position == settingsSectionRow2 ||
                     position == numberSectionRow || position == helpHeaderRow || position == debugHeaderRow || position == botPermissionsHeader) {
                 return VIEW_TYPE_HEADER;
-            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow) {
+            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow ||
+                    position == telezhkaIdRow || position == telezhkaDateRow || position == telezhkaDcRow) {
                 return VIEW_TYPE_TEXT_DETAIL;
             } else if (position == usernameRow || position == setUsernameRow) {
                 return VIEW_TYPE_TEXT_DETAIL_MULTILINE;
@@ -15823,6 +15894,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, infoEndRowEmpty, sparseIntArray);
             put(++pointer, phoneRow, sparseIntArray);
             put(++pointer, noteRow, sparseIntArray);
+            put(++pointer, telezhkaIdRow, sparseIntArray);
+            put(++pointer, telezhkaDateRow, sparseIntArray);
+            put(++pointer, telezhkaDcRow, sparseIntArray);
             put(++pointer, locationRow, sparseIntArray);
             put(++pointer, userInfoRow, sparseIntArray);
             put(++pointer, channelInfoRow, sparseIntArray);
