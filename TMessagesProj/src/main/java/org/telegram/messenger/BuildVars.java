@@ -61,6 +61,10 @@ public class BuildVars {
 
     // works only on official app ids, disable on your forks
     public static boolean SUPPORTS_PASSKEYS = false;
+    // the second main tab: News, or Contacts as before them
+
+    // Firebase phone number verification is tied to the official app id too
+    public static boolean SUPPORTS_FPNV = false;
 
     static {
         if (ApplicationLoader.applicationContext != null) {
