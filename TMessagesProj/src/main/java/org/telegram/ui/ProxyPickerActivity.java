@@ -12,7 +12,6 @@ import static org.telegram.messenger.LocaleController.getString;
 
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.SystemClock;
 import android.text.TextUtils;
@@ -33,7 +32,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
-import org.telegram.messenger.TelezhkaPingMonitor;
+import org.telegram.messenger.TelezhkaProxyRescue;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -51,14 +50,10 @@ import org.telegram.utils.proxy.ProxySettings;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 /**
@@ -77,7 +72,6 @@ public class ProxyPickerActivity extends BaseFragment {
     private static final long CHECK_TIMEOUT_MS = 7000;
     private static final int MAX_RESPONSE_BYTES = 1024 * 1024;
     private static final int CONNECT_TRIES = 5;
-    private static final long CONNECT_WAIT_MS = 12000;
 
     private static final Pattern HOST_PATTERN = Pattern.compile("^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$|^[0-9A-Fa-f:]{2,39}$");
     private static final Pattern HEX_PATTERN = Pattern.compile("^[0-9A-Fa-f]+$");
@@ -129,6 +123,7 @@ public class ProxyPickerActivity extends BaseFragment {
     private boolean inProgress;
     private boolean destroyed;
     private int generation;
+    private TelezhkaProxyRescue rescue;
 
     public ProxyPickerActivity() {
         this(false);
@@ -349,6 +344,11 @@ public class ProxyPickerActivity extends BaseFragment {
     }
 
     private void start() {
+        // The user picks by hand now: stop a background search so the two do not switch proxies at once
+        if (TelezhkaProxyRescue.isRunning()) {
+            TelezhkaProxyRescue.getActive().cancel();
+        }
+        rescue = null;
         inProgress = true;
         final int gen = ++generation;
         pickButton.setText(getString(R.string.Cancel), true);
@@ -386,6 +386,10 @@ public class ProxyPickerActivity extends BaseFragment {
 
     private void cancel() {
         generation++;
+        if (rescue != null) {
+            rescue.cancel();
+            rescue = null;
+        }
         finish(getString(R.string.ProxyPickerCancelled));
     }
 
@@ -761,117 +765,61 @@ public class ProxyPickerActivity extends BaseFragment {
         return state == ConnectionsManager.ConnectionStateConnected || state == ConnectionsManager.ConnectionStateUpdating;
     }
 
+    // Telegram is unreachable and the checks got no answer: emergency mode (TCP checks, then real connection tries)
     private void startTcpChecks(int gen) {
         statusTextView.setText(getString(R.string.ProxyPickerTcpCheck));
         gridView.resetAll();
+        ArrayList<ProxySettings> list = new ArrayList<>();
         for (Candidate candidate : candidates) {
             gridView.setState(candidate.index, ProxyDotGridView.SCANNING);
+            list.add(candidate.settings);
         }
-        final ArrayList<Candidate> list = new ArrayList<>(candidates);
-        new Thread(() -> {
-            ExecutorService executor = Executors.newFixedThreadPool(PARALLEL_CHECKS);
-            for (Candidate candidate : list) {
-                candidate.ping = -1;
-                executor.execute(() -> {
-                    if (gen != generation) {
-                        return;
-                    }
-                    long startTime = SystemClock.elapsedRealtime();
-                    try (Socket socket = new Socket()) {
-                        socket.connect(new InetSocketAddress(candidate.settings.getAddress(), candidate.settings.getPort()), (int) CHECK_TIMEOUT_MS);
-                        candidate.ping = Math.max(1, SystemClock.elapsedRealtime() - startTime);
-                    } catch (Exception ignore) {
-                    }
-                });
-            }
-            executor.shutdown();
-            try {
-                executor.awaitTermination(CHECK_TIMEOUT_MS * (list.size() / PARALLEL_CHECKS + 2), java.util.concurrent.TimeUnit.MILLISECONDS);
-            } catch (InterruptedException ignore) {
-            }
-            ArrayList<Candidate> reachable = new ArrayList<>();
-            for (Candidate candidate : list) {
-                if (candidate.ping > 0) {
-                    reachable.add(candidate);
+        rescue = TelezhkaProxyRescue.start(list, list.size(), CONNECT_TRIES, new TelezhkaProxyRescue.Callback() {
+            @Override
+            public void onTcpChecked(int index, boolean reachable) {
+                if (gen == generation && !destroyed) {
+                    gridView.setState(index, reachable ? ProxyDotGridView.OK : ProxyDotGridView.BAD);
                 }
             }
-            Collections.sort(reachable, (a, b) -> Long.compare(a.ping, b.ping));
-            AndroidUtilities.runOnUIThread(() -> {
-                if (gen != generation) {
+
+            @Override
+            public void onTcpDone(int reachable, int total) {
+                if (gen == generation && !destroyed) {
+                    workingValue.setText(String.valueOf(reachable));
+                    checkedValue.setText(String.valueOf(total));
+                }
+            }
+
+            @Override
+            public void onTrying(int index, int attempt, int attempts) {
+                if (gen == generation && !destroyed) {
+                    statusTextView.setText(formatString(R.string.ProxyPickerTrying, attempt, attempts));
+                }
+            }
+
+            @Override
+            public void onTryFailed(int index) {
+                if (gen == generation && !destroyed) {
+                    gridView.setState(index, ProxyDotGridView.BAD);
+                }
+            }
+
+            @Override
+            public void onFinished(TelezhkaProxyRescue.Result result) {
+                rescue = null;
+                if (gen != generation || result.cancelled) {
+                    return;
+                }
+                if (result.settings == null) {
+                    finish(getString(R.string.ProxyPickerNothingFound));
                     return;
                 }
                 if (!destroyed) {
-                    for (Candidate candidate : list) {
-                        gridView.setState(candidate.index, candidate.ping > 0 ? ProxyDotGridView.OK : ProxyDotGridView.BAD);
-                    }
-                    workingValue.setText(String.valueOf(reachable.size()));
-                    checkedValue.setText(String.valueOf(list.size()));
+                    markBest(result.index, result.ping);
                 }
-                if (reachable.isEmpty()) {
-                    finish(getString(R.string.ProxyPickerNothingFound));
-                } else {
-                    tryConnect(gen, reachable, 0);
-                }
-            });
-        }).start();
-    }
-
-    // Enables reachable proxies one by one until the app actually connects through one of them.
-    private void tryConnect(int gen, ArrayList<Candidate> reachable, int index) {
-        if (gen != generation) {
-            return;
-        }
-        if (index >= reachable.size() || index >= CONNECT_TRIES) {
-            disableProxy();
-            finish(getString(R.string.ProxyPickerNothingFound));
-            return;
-        }
-        Candidate candidate = reachable.get(index);
-        if (!destroyed) {
-            statusTextView.setText(formatString(R.string.ProxyPickerTrying, index + 1, Math.min(reachable.size(), CONNECT_TRIES)));
-        }
-        enableProxy(SharedConfig.addProxy(new SharedConfig.ProxyInfo(candidate.settings)));
-        final long startTime = SystemClock.elapsedRealtime();
-        AndroidUtilities.runOnUIThread(new Runnable() {
-            @Override
-            public void run() {
-                if (gen != generation) {
-                    return;
-                }
-                if (isConnected()) {
-                    ArrayList<Candidate> rest = new ArrayList<>(reachable.subList(index + 1, reachable.size()));
-                    // Spares here are only known to accept TCP; ProxyListActivity re-checks them later.
-                    for (int i = rest.size() - 1; i >= 0; i--) {
-                        SharedConfig.addProxy(new SharedConfig.ProxyInfo(rest.get(i).settings));
-                    }
-                    SharedConfig.saveProxyList();
-                    if (!destroyed) {
-                        markBest(candidate.index, candidate.ping);
-                    }
-                    finishSuccess(candidate.settings, candidate.ping, rest.size());
-                } else if (SystemClock.elapsedRealtime() - startTime < CONNECT_WAIT_MS) {
-                    AndroidUtilities.runOnUIThread(this, 500);
-                } else {
-                    if (!destroyed) {
-                        gridView.setState(candidate.index, ProxyDotGridView.BAD);
-                    }
-                    SharedConfig.ProxyInfo failed = findProxy(candidate.settings);
-                    if (failed != null) {
-                        SharedConfig.deleteProxy(failed);
-                    }
-                    tryConnect(gen, reachable, index + 1);
-                }
+                finishSuccess(result.settings, result.ping, result.spares);
             }
-        }, 500);
-    }
-
-    private static SharedConfig.ProxyInfo findProxy(ProxySettings settings) {
-        for (SharedConfig.ProxyInfo info : SharedConfig.proxyList) {
-            if (info.settings.equals(settings)) {
-                return info;
-            }
-        }
-        return null;
+        });
     }
 
     private void applyWorking(ArrayList<Candidate> working) {
@@ -886,26 +834,7 @@ public class ProxyPickerActivity extends BaseFragment {
             info.availableCheckTime = now;
             best = info;
         }
-        enableProxy(best);
+        TelezhkaProxyRescue.enable(best);
         SharedConfig.saveProxyList();
-    }
-
-    private static void enableProxy(SharedConfig.ProxyInfo info) {
-        SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
-        info.settings.toSharedPreferences(editor);
-        editor.putBoolean("proxy_enabled", true);
-        editor.commit();
-        SharedConfig.currentProxy = info;
-        ConnectionsManager.setProxySettings(true, info.settings);
-        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
-        TelezhkaPingMonitor.refresh();
-    }
-
-    private static void disableProxy() {
-        SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
-        editor.putBoolean("proxy_enabled", false);
-        editor.commit();
-        ConnectionsManager.setProxySettings(false, null);
-        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
     }
 }

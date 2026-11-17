@@ -217,6 +217,7 @@ public class ApplicationLoader extends Application {
                         ConnectionsManager.getInstance(a).checkConnection();
                         FileLoader.getInstance(a).onNetworkChanged(isSlow);
                     }
+                    TelezhkaProxyAutopilot.onNetworkChanged();
                 }
             };
             IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
