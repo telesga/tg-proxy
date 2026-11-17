@@ -11862,7 +11862,14 @@
     <string name="TelezhkaMusicNowPlaying">Сейчас играет</string>
     <string name="TelezhkaAutopilotTitle">Автопилот</string>
     <string name="TelezhkaAutopilotLabel">Следить за прокси самой</string>
-    <string name="TelezhkaAutopilotInfo">Раз в полчаса обновляет список, убирает нерабочие и переключает на самый быстрый</string>
+    <string name="TelezhkaAutopilotInfo">Раз в полчаса обновляет список, убирает нерабочие и переключает на самый быстрый. Если связи нет, сама ищет рабочий прокси, пока не подключится</string>
+    <string name="TelezhkaSearchLoading">Ищу рабочий прокси… обновляю список</string>
+    <string name="TelezhkaSearchTcp">Ищу рабочий прокси… проверяю адреса: %1$d</string>
+    <string name="TelezhkaSearchTrying">Ищу рабочий прокси… (%1$d из %2$d)</string>
+    <string name="TelezhkaSearchRetry">Рабочий прокси пока не найден. Следующая попытка через %1$s</string>
+    <string name="TelezhkaSearchNoNetwork">Нет интернета. Продолжу поиск, когда появится сеть</string>
+    <string name="TelezhkaSearchSeconds">%1$d с</string>
+    <string name="TelezhkaSearchMinutes">%1$d мин</string>
     <string name="TelezhkaAutopilotOff">Выключен. Прокси меняются только вручную.</string>
     <string name="TelezhkaAutopilotNever">Первая проверка будет через несколько секунд после запуска.</string>
     <string name="TelezhkaAutopilotStatus">Проверено %1$d мин назад · новых %2$d · удалено нерабочих %3$d</string>
