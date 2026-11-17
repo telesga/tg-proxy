@@ -40,7 +40,5 @@
   {"server": "tomasu22.fernlark.xyz", "port": 8443, "secret": "eee279647020eebfa18cc77b516b7bfd85786170692e6f7a6f6e2e7275"},
   {"server": "lonezo26.saltfern.xyz", "port": 8443, "secret": "eeec569fca8169b57457c573b55bbaa8ec706574726f766963682e7275"},
   {"server": "ririny44.tidelark.cc", "port": 8443, "secret": "ee908a3490ac6759588ba515fac7ff5099706574726f766963682e7275"},
-  {"server": "lene98.mossharbor.xyz", "port": 8443, "secret": "eeee11eba813b57526bbb2594bae8959e7786170692e6f7a6f6e2e7275"},
-  {"server": "mt1.leeroy.uz", "port": 443, "secret": "eede199cd5cc7674e522ef10f4359224d36d2e6265626f6f2e7275"},
-  {"server": "mt3.leeroy.uz", "port": 443, "secret": "eede199cd5cc7674e522ef10f4359224d36d2e6265626f6f2e7275"}
+  {"server": "lene98.mossharbor.xyz", "port": 8443, "secret": "eeee11eba813b57526bbb2594bae8959e7786170692e6f7a6f6e2e7275"}
 ]
