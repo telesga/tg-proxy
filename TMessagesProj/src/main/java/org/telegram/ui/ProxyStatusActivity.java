@@ -33,6 +33,7 @@ import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.TelezhkaPingMonitor;
 import org.telegram.messenger.TelezhkaProxyAutopilot;
+import org.telegram.messenger.TelezhkaProxyRescue;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BackDrawable;
@@ -72,6 +73,16 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
     private LinearLayout lastCard;
     private TextView sourceValue;
     private TextView autopilotStatus;
+    private TextView searchText;
+    // Status of the autopilot's own search: refreshed on changes and once a second for the countdown
+    private final Runnable searchListener = this::updateSearch;
+    private final Runnable searchTicker = new Runnable() {
+        @Override
+        public void run() {
+            updateSearch();
+            AndroidUtilities.runOnUIThread(this, 1000);
+        }
+    };
     private final TelezhkaPingMonitor.Listener pingListener = ping -> updateHero();
 
     @Override
@@ -88,6 +99,8 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.proxySettingsChanged);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.didUpdateConnectionState);
         TelezhkaPingMonitor.stop(pingListener);
+        TelezhkaProxyRescue.removeStatusListener(searchListener);
+        AndroidUtilities.cancelRunOnUIThread(searchTicker);
     }
 
     @Override
@@ -95,12 +108,17 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
         super.onResume();
         updateAll();
         TelezhkaPingMonitor.start(pingListener, 2000);
+        TelezhkaProxyRescue.addStatusListener(searchListener);
+        AndroidUtilities.cancelRunOnUIThread(searchTicker);
+        searchTicker.run();
     }
 
     @Override
     public void onPause() {
         super.onPause();
         TelezhkaPingMonitor.stop(pingListener);
+        TelezhkaProxyRescue.removeStatusListener(searchListener);
+        AndroidUtilities.cancelRunOnUIThread(searchTicker);
     }
 
     @Override
@@ -152,6 +170,13 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
         pillText.setTextColor(TEXT);
         pill.addView(pillText);
         hero.addView(pill, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT));
+
+        // "Ищу рабочий прокси… (3 из 8)": shown while the autopilot searches by itself
+        searchText = new TextView(context);
+        searchText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        searchText.setTextColor(SIGNAL);
+        searchText.setVisibility(View.GONE);
+        hero.addView(searchText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
 
         pingText = new TextView(context);
         pingText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 34);
@@ -307,6 +332,21 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
                 preferences.getInt(TelezhkaProxyAutopilot.PREF_ADDED, 0), preferences.getInt(TelezhkaProxyAutopilot.PREF_REMOVED, 0)));
     }
 
+    private void updateSearch() {
+        if (searchText == null) {
+            return;
+        }
+        String status = TelezhkaProxyAutopilot.getSearchStatus();
+        if (status == null) {
+            searchText.setVisibility(View.GONE);
+        } else {
+            if (!status.contentEquals(searchText.getText())) {
+                searchText.setText(status);
+            }
+            searchText.setVisibility(View.VISIBLE);
+        }
+    }
+
     private void updateSource() {
         if (sourceValue != null) {
             sourceValue.setText(ProxyPickerActivity.getListSourceLabel());
@@ -342,6 +382,7 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
         }
         updateAutopilot();
         updateHero();
+        updateSearch();
         updateLastPick();
         updateSpares();
     }
@@ -449,14 +490,11 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
     }
 
     private void switchTo(SharedConfig.ProxyInfo info) {
-        SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
-        info.settings.toSharedPreferences(editor);
-        editor.putBoolean("proxy_enabled", true);
-        editor.commit();
-        SharedConfig.currentProxy = info;
-        ConnectionsManager.setProxySettings(true, info.settings);
-        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
-        TelezhkaPingMonitor.refresh();
+        // A hand-picked proxy wins over a background search
+        if (TelezhkaProxyRescue.isRunning()) {
+            TelezhkaProxyRescue.getActive().cancel();
+        }
+        TelezhkaProxyRescue.enable(info);
         updateAll();
     }
 
