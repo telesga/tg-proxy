@@ -19,6 +19,5 @@
   {"server": "t4.myrka.digital", "port": 443, "secret": "ee1111222233334444555566667777888874342e6d79726b612e6469676974616c"},
   {"server": "kima.rabotaet.online", "port": 443, "secret": "ee12e7e5f961f258b04af168a1cba6318a6b696d612e7261626f746165742e6f6e6c696e65"},
   {"server": "4x4.subaru-volga.com", "port": 443, "secret": "ee54701e1686de96a44721501a7bee9e4c6c796e657474652e6d79726b612e6469676974616c"},
-  {"server": "lynette.myrka.digital", "port": 443, "secret": "ee54701e1686de96a44721501a7bee9e4c6c796e657474652e6d79726b612e6469676974616c"},
-  {"server": "static.antenna-mzt.live", "port": 443, "secret": "ee5a42e3752e724f2fdae9c117e7f076fe73746f72652e737465616d706f77657265642e636f6d"}
+  {"server": "lynette.myrka.digital", "port": 443, "secret": "ee54701e1686de96a44721501a7bee9e4c6c796e657474652e6d79726b612e6469676974616c"}
 ]
