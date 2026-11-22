@@ -11875,6 +11875,7 @@
     <string name="TelezhkaAutopilotStatus">Проверено %1$d мин назад · новых %2$d · удалено нерабочих %3$d</string>
     <string name="TelezhkaAliveStatus">Живых прокси: %1$d из %2$d · проверено %3$d мин назад</string>
     <string name="TelezhkaAliveNever">Живые прокси ещё не проверялись</string>
+    <string name="TelezhkaConnectionSilent">Не отвечают: %1$d</string>
     <string name="TelezhkaMinAliveLabel">Искать новые заранее</string>
     <string name="TelezhkaMinAliveValue">когда живых меньше %1$d</string>
     <string name="TelezhkaMinAliveTitle">Искать новые прокси, когда живых осталось меньше</string>

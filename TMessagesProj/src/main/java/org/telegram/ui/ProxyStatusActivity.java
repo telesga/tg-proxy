@@ -472,7 +472,8 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
         }
         boolean exempt = isBatteryExempt();
         batteryLabel.setVisibility(exempt ? View.GONE : View.VISIBLE);
-        batteryInfo.setText(getString(exempt ? R.string.TelezhkaBatteryAllowed : R.string.TelezhkaBatteryInfo));
+        int infoRes = exempt ? R.string.TelezhkaBatteryAllowed : R.string.TelezhkaBatteryInfo;
+        batteryInfo.setText(getString(infoRes));
         batteryInfo.setTextColor(exempt ? OK : MUTE);
         batteryRow.setClickable(!exempt);
     }
@@ -603,16 +604,25 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
                 DateFormat.getTimeFormat(getParentActivity() != null ? getParentActivity() : lastInfo.getContext()).format(new Date(time))));
     }
 
+    // Working spares first, fastest on top; the ones that did not answer (or are not checked yet)
+    // go below a "Не отвечают: N" line, dimmed
     private void updateSpares() {
         sparesList.removeAllViews();
         Context context = sparesList.getContext();
-        ArrayList<SharedConfig.ProxyInfo> spares = new ArrayList<>();
+        ArrayList<SharedConfig.ProxyInfo> working = new ArrayList<>();
+        ArrayList<SharedConfig.ProxyInfo> silent = new ArrayList<>();
         for (SharedConfig.ProxyInfo info : SharedConfig.proxyList) {
-            if (info != SharedConfig.currentProxy || !SharedConfig.isProxyEnabled()) {
-                spares.add(info);
+            if (info == SharedConfig.currentProxy && SharedConfig.isProxyEnabled()) {
+                continue;
+            }
+            if (info.available && info.ping > 0) {
+                working.add(info);
+            } else {
+                silent.add(info);
             }
         }
-        if (spares.isEmpty()) {
+        java.util.Collections.sort(working, (a, b) -> Long.compare(a.ping, b.ping));
+        if (working.isEmpty() && silent.isEmpty()) {
             TextView empty = new TextView(context);
             empty.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             empty.setTextColor(MUTE);
@@ -621,40 +631,57 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
             sparesList.addView(empty);
             return;
         }
-        for (int i = 0; i < spares.size(); i++) {
-            SharedConfig.ProxyInfo info = spares.get(i);
-            LinearLayout row = new LinearLayout(context);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(14), dp(13), dp(14), dp(13));
-            row.setBackground(Theme.createSelectorDrawable(0x14FFFFFF, Theme.RIPPLE_MASK_ALL));
-            PingBarsView bars = new PingBarsView(context, info.available ? info.ping : -1);
-            row.addView(bars, LayoutHelper.createLinear(16, 14, 0, 0, 12, 0));
-            TextView address = new TextView(context);
-            address.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-            address.setTypeface(Typeface.MONOSPACE);
-            address.setTextColor(TEXT);
-            address.setSingleLine(true);
-            address.setEllipsize(TextUtils.TruncateAt.END);
-            address.setText(info.settings.getAddress() + " : " + info.settings.getPort());
-            row.addView(address, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
-            TextView ping = new TextView(context);
-            ping.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-            ping.setTypeface(Typeface.MONOSPACE);
-            ping.setTextColor(MUTE);
-            ping.setText(info.available && info.ping > 0 ? info.ping + " " + getString(R.string.TelezhkaMs) : "—");
-            row.addView(ping, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 8, 0, 0, 0));
-            row.setOnClickListener(v -> switchTo(info));
-            row.setAlpha(0f);
-            row.setTranslationY(dp(8));
-            row.animate().alpha(1f).translationY(0).setStartDelay(40L * i).setDuration(300).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
-            sparesList.addView(row);
-            if (i < spares.size() - 1) {
-                View divider = new View(context);
-                divider.setBackgroundColor(LINE);
-                sparesList.addView(divider, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 14, 0, 14, 0));
+        int index = 0;
+        for (int i = 0; i < working.size(); i++) {
+            if (i > 0) {
+                sparesList.addView(divider(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 14, 0, 14, 0));
+            }
+            addSpareRow(context, working.get(i), index++, false);
+        }
+        if (!silent.isEmpty()) {
+            if (!working.isEmpty()) {
+                sparesList.addView(divider(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 14, 0, 14, 0));
+            }
+            TextView silentHeader = new TextView(context);
+            silentHeader.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            silentHeader.setTypeface(AndroidUtilities.bold());
+            silentHeader.setTextColor(MUTE);
+            silentHeader.setPadding(dp(16), dp(12), dp(16), dp(4));
+            silentHeader.setText(formatString(R.string.TelezhkaConnectionSilent, silent.size()));
+            sparesList.addView(silentHeader);
+            for (int i = 0; i < silent.size(); i++) {
+                addSpareRow(context, silent.get(i), index++, true);
             }
         }
+    }
+
+    private void addSpareRow(Context context, SharedConfig.ProxyInfo info, int index, boolean dimmed) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14), dimmed ? dp(9) : dp(13), dp(14), dimmed ? dp(9) : dp(13));
+        row.setBackground(Theme.createSelectorDrawable(0x14FFFFFF, Theme.RIPPLE_MASK_ALL));
+        PingBarsView bars = new PingBarsView(context, info.available ? info.ping : -1);
+        row.addView(bars, LayoutHelper.createLinear(16, 14, 0, 0, 12, 0));
+        TextView address = new TextView(context);
+        address.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        address.setTypeface(Typeface.MONOSPACE);
+        address.setTextColor(dimmed ? MUTE : TEXT);
+        address.setSingleLine(true);
+        address.setEllipsize(TextUtils.TruncateAt.END);
+        address.setText(info.settings.getAddress() + " : " + info.settings.getPort());
+        row.addView(address, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+        TextView ping = new TextView(context);
+        ping.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        ping.setTypeface(Typeface.MONOSPACE);
+        ping.setTextColor(MUTE);
+        ping.setText(!dimmed ? info.ping + " " + getString(R.string.TelezhkaMs) : "—");
+        row.addView(ping, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 8, 0, 0, 0));
+        row.setOnClickListener(v -> switchTo(info));
+        row.setAlpha(0f);
+        row.setTranslationY(dp(8));
+        row.animate().alpha(dimmed ? 0.5f : 1f).translationY(0).setStartDelay(40L * Math.min(index, 12)).setDuration(300).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+        sparesList.addView(row);
     }
 
     private void switchTo(SharedConfig.ProxyInfo info) {
