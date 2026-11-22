@@ -29,7 +29,7 @@ import java.util.Map;
  *   "Подобрать прокси" button (TelezhkaProxyRescue) and repeats it until it connects:
  *   after 20 s, 1 min, 2 min, 5 min and then every 5 min, and right away when the network
  *   comes back or the app is opened. Does nothing while there is no internet at all.
- * Can be switched off on the "Подключение" screen.
+ * Can be switched off on the "Подключение" screen; while it searches, the screen shows a status line.
  */
 public class TelezhkaProxyAutopilot implements NotificationCenter.NotificationCenterDelegate {
 
