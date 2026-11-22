@@ -12,11 +12,15 @@ From every post it takes proxy links (t.me/proxy?..., tg://proxy?...) and plain 
 "Server: ... Port: ... Secret: ...", and writes the format the app expects:
 [{"server": "...", "port": 443, "secret": "..."}]
 
+Only posts of the last MAX_AGE_DAYS days count. Channels go in priority order (CHANNELS, or the
+order given on the command line): all proxies of the first channel, newest first, then the next one.
+
 Usage: update_proxies.py [output] [channel ...]
 """
 
 import asyncio
 import base64
+import datetime
 import html
 import json
 import os
@@ -26,14 +30,18 @@ import unicodedata
 import urllib.parse
 import urllib.request
 
-CHANNELS = ["mtp4tg", "vnespiska"]
-MESSAGES_PER_CHANNEL = 300   # via the account
+# In priority order: all fresh proxies of the first channel go before the second one's.
+# @vnespiska checks its proxies from Russia, so it comes first.
+CHANNELS = ["vnespiska", "mtp4tg"]
+MAX_AGE_DAYS = 3             # older posts are skipped: their proxies are mostly dead
+MESSAGES_PER_CHANNEL = 500   # via the account, upper limit within MAX_AGE_DAYS
 PAGES_PER_CHANNEL = 5        # via the web preview, each page holds about 20 posts
 MAX_PROXIES = 100            # the app checks at most 100
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 
 LINK_RE = re.compile(r"""(?:tg://|https?://(?:www\.)?(?:t\.me|telegram\.me)/)proxy\?([^"'<>\s]+)""", re.I)
 POST_ID_RE = re.compile(r'data-post="[^"/]+/(\d+)"')
+POST_TIME_RE = re.compile(r'<time[^>]+datetime="([^"]+)"')
 HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$|^[0-9A-Fa-f:]{2,39}$")
 HEX_RE = re.compile(r"^[0-9A-Fa-f]+$")
 SPLIT_LINK_RE = re.compile(r"proxy\?\s+(?=(?:server|host|port|secret)=)", re.I)
@@ -190,6 +198,8 @@ async def read_with_account(channels, session, api_id, api_hash):
                 read = with_proxies = 0
                 missed = []   # posts that mention a proxy link but gave nothing: shown in the log
                 async for message in client.iter_messages(channel, limit=MESSAGES_PER_CHANNEL):
+                    if is_too_old(message.date):
+                        break  # newest first, so everything further is older too
                     read += 1
                     strings = message_strings(message)
                     found = proxies_from_text(strings)
@@ -200,7 +210,8 @@ async def read_with_account(channels, session, api_id, api_hash):
                         missed.append((message.id, message.date, strings))
                 result[channel] = proxies
                 print(f"{channel}: {len(proxies)} links via the account "
-                      f"({read} posts read, {with_proxies} with proxies)", file=sys.stderr)
+                      f"({read} posts of the last {MAX_AGE_DAYS} days read, {with_proxies} with proxies)",
+                      file=sys.stderr)
                 servers = list(dict.fromkeys(p["server"] for p in proxies))
                 print(f"{channel}: newest: {', '.join(servers[:5]) or '-'}", file=sys.stderr)
                 for message_id, date, strings in missed:
@@ -214,6 +225,18 @@ async def read_with_account(channels, session, api_id, api_hash):
     finally:
         await client.disconnect()
     return result
+
+
+def oldest_allowed():
+    return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=MAX_AGE_DAYS)
+
+
+def is_too_old(date):
+    if date is None:
+        return False
+    if date.tzinfo is None:
+        date = date.replace(tzinfo=datetime.timezone.utc)
+    return date < oldest_allowed()
 
 
 def account_settings():
@@ -247,11 +270,22 @@ def read_web(channel):
         except Exception as e:
             print(f"{channel}: {url} failed: {e}", file=sys.stderr)
             break
-        found = [p for p in (parse_link(q) for q in LINK_RE.findall(page)) if p]
+        # One chunk per post, each with its own <time datetime=...>
+        found, too_old = [], False
+        for post in page.split('data-post="')[1:]:
+            time = POST_TIME_RE.search(post)
+            if time:
+                try:
+                    if is_too_old(datetime.datetime.fromisoformat(time.group(1))):
+                        too_old = True
+                        continue
+                except ValueError:
+                    pass
+            found.extend(p for p in (parse_link(q) for q in LINK_RE.findall(clean(post))) if p)
         # Posts on a page go oldest to newest; we want newest first overall
         proxies.extend(reversed(found))
         ids = [int(i) for i in POST_ID_RE.findall(page)]
-        if not ids or min(ids) <= 1:
+        if too_old or not ids or min(ids) <= 1:
             break
         before = min(ids)
     print(f"{channel}: {len(proxies)} links via the web preview", file=sys.stderr)
@@ -260,26 +294,15 @@ def read_web(channel):
 
 # ---- together ----
 
-def interleave(lists):
-    """Newest of each channel first, so one busy channel does not push the others out of the 100."""
-    # One post can give the same proxy several times (quote, copy button...): drop repeats inside
-    # each channel first, otherwise they eat that channel's turns
-    unique = []
-    for proxies in lists:
-        own = {}
-        for proxy in proxies:
-            own.setdefault((proxy["server"].lower(), proxy["port"], proxy["secret"]), proxy)
-        unique.append(list(own.values()))
-    lists = unique
+def by_priority(lists):
+    """Channels in priority order, newest first inside each, without repeats."""
     result, seen = [], set()
-    for i in range(max((len(l) for l in lists), default=0)):
-        for proxies in lists:
-            if i < len(proxies):
-                proxy = proxies[i]
-                key = (proxy["server"].lower(), proxy["port"], proxy["secret"])
-                if key not in seen:
-                    seen.add(key)
-                    result.append(proxy)
+    for proxies in lists:
+        for proxy in proxies:
+            key = (proxy["server"].lower(), proxy["port"], proxy["secret"])
+            if key not in seen:
+                seen.add(key)
+                result.append(proxy)
     return result
 
 
@@ -300,7 +323,7 @@ def main():
         if not by_channel.get(channel):
             by_channel[channel] = read_web(channel)
 
-    result = interleave([by_channel[c] for c in channels])[:MAX_PROXIES]
+    result = by_priority([by_channel[c] for c in channels])[:MAX_PROXIES]
     if not result:
         # Keep the previous list rather than publishing an empty one when the channels are unreachable
         print("No proxies found, leaving the file as it is", file=sys.stderr)
