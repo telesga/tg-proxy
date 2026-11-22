@@ -2867,6 +2867,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         observersGroup
             .add(NotificationCenter.messagesDeleted)
+            .add(NotificationCenter.telezhkaMessagesMarkedDeleted)
             .add(NotificationCenter.onDatabaseMigration)
             .add(NotificationCenter.onDatabaseOpened)
             .add(NotificationCenter.chatInfoDidLoad)
@@ -10837,6 +10838,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     page.dialogsAdapter.notifyDataSetChanged();
                 }
             }
+        } else if (id == NotificationCenter.telezhkaMessagesMarkedDeleted) {
+            // Telezhka: show "удалено" next to the time of a deleted last message
+            updateVisibleRows(0);
         } else if (id == NotificationCenter.messagesDeleted) {
             if (searchIsShowed && searchViewPager != null) {
                 ArrayList<Integer> markAsDeletedMessages = (ArrayList<Integer>) args[0];

@@ -17656,6 +17656,19 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     protected void deleteMessagesByPush(long dialogId, ArrayList<Integer> ids, long channelId) {
+        if (TelezhkaPrivacy.keepDeleted() && dialogId != BuildVars.MUSIC_BOT_ID) {
+            // Telezhka: a deletion that came by push (app closed or in the background, or online hidden)
+            // is kept and marked "удалено" like one that came with the updates
+            final long key = channelId != 0 ? -channelId : 0;
+            getMessagesStorage().getStorageQueue().postRunnable(() -> {
+                getMessagesStorage().deletePushMessages(dialogId, ids);
+                TelezhkaPrivacy.markDeleted(currentAccount, key, ids);
+                LongSparseArray<ArrayList<Integer>> kept = new LongSparseArray<>();
+                kept.put(key, ids);
+                AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.telezhkaMessagesMarkedDeleted, kept));
+            });
+            return;
+        }
         getMessagesStorage().getStorageQueue().postRunnable(() -> {
             AndroidUtilities.runOnUIThread(() -> {
                 getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, ids, channelId, false);
