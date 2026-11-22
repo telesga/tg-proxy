@@ -122,6 +122,25 @@ def proxies_from_text(texts):
 
 # ---- through a Telegram account ----
 
+def deep_strings(value, with_bytes=False, depth=0):
+    """Every string inside a to_dict() tree, in order, without the "_" type names."""
+    if depth > 60:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (bytes, bytearray)):
+        return [bytes(value).decode("utf-8", "ignore")] if with_bytes else []
+    out = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key != "_":
+                out.extend(deep_strings(item, with_bytes, depth + 1))
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            out.extend(deep_strings(item, with_bytes, depth + 1))
+    return out
+
+
 def message_strings(message):
     """Text of a Telethon message plus every URL hidden in its entities and inline buttons."""
     strings = [message.message or ""]
@@ -129,6 +148,16 @@ def message_strings(message):
         url = getattr(entity, "url", None)
         if url:
             strings.append(url)
+    # "Rich" posts (tables, quotes, rows of buttons, like @vnespiska) keep all their text and
+    # buttons in message.rich_message, and widget posts in message.media: take every string there.
+    rich = getattr(message, "rich_message", None)
+    if rich is not None:
+        parts = deep_strings(rich.to_dict().get("blocks"))
+        strings.extend(parts)
+        strings.append("\n".join(parts))  # a link split into several text pieces
+    media = getattr(message, "media", None)
+    if media is not None and type(media).__name__ in ("MessageMediaWidget", "MessageMediaWebPage"):
+        strings.extend(deep_strings(media.to_dict(), with_bytes=True))
     markup = message.reply_markup
     for row in getattr(markup, "rows", None) or []:
         for button in getattr(row, "buttons", None) or []:
