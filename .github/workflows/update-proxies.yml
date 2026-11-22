@@ -26,7 +26,16 @@ jobs:
             .github/scripts
           sparse-checkout-cone-mode: false
 
+      # Telethon reads the channels through a separate Telegram account (TG_SESSION, made once with
+      # .github/scripts/make_session.py). Without the secret the script falls back to the web preview.
+      - name: Install Telethon
+        run: pip install --quiet "telethon>=1.36,<2"
+
       - name: Collect proxies from channels
+        env:
+          TG_SESSION: ${{ secrets.TG_SESSION }}
+          TG_API_ID: ${{ secrets.TG_API_ID || secrets.TELEGRAM_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH || secrets.TELEGRAM_API_HASH }}
         run: python3 .github/scripts/update_proxies.py proxies.json
 
       - name: Commit if changed
