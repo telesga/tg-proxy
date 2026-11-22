@@ -262,6 +262,15 @@ def read_web(channel):
 
 def interleave(lists):
     """Newest of each channel first, so one busy channel does not push the others out of the 100."""
+    # One post can give the same proxy several times (quote, copy button...): drop repeats inside
+    # each channel first, otherwise they eat that channel's turns
+    unique = []
+    for proxies in lists:
+        own = {}
+        for proxy in proxies:
+            own.setdefault((proxy["server"].lower(), proxy["port"], proxy["secret"]), proxy)
+        unique.append(list(own.values()))
+    lists = unique
     result, seen = [], set()
     for i in range(max((len(l) for l in lists), default=0)):
         for proxies in lists:
