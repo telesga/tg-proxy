@@ -836,5 +836,7 @@ public class ProxyPickerActivity extends BaseFragment {
         }
         TelezhkaProxyRescue.enable(best);
         SharedConfig.saveProxyList();
+        // The reserve on the "Подключение" screen now counts these too
+        org.telegram.messenger.TelezhkaProxyAutopilot.recordAlive();
     }
 }

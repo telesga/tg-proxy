@@ -122,6 +122,26 @@ public class TelezhkaProxyAutopilot implements NotificationCenter.NotificationCe
         INSTANCE.scheduleQuick(1000);
     }
 
+    // Proxies that answered their last check: the same thing the spares list on the screen shows
+    public static int countAlive() {
+        int alive = 0;
+        for (SharedConfig.ProxyInfo info : SharedConfig.proxyList) {
+            if (info.available && info.ping > 0) {
+                alive++;
+            }
+        }
+        return alive;
+    }
+
+    // Save the reserve for the "Подключение" screen and for the threshold; also called by the picker
+    public static void recordAlive() {
+        MessagesController.getGlobalMainSettings().edit()
+                .putInt(PREF_ALIVE, countAlive())
+                .putInt(PREF_ALIVE_TOTAL, SharedConfig.proxyList.size())
+                .putLong(PREF_ALIVE_TIME, System.currentTimeMillis())
+                .apply();
+    }
+
     // Busy with a check or an emergency search (TelezhkaProxyJob waits for this to end)
     public static boolean isBusy() {
         return INSTANCE.running || TelezhkaProxyRescue.isRunning();
@@ -454,6 +474,10 @@ public class TelezhkaProxyAutopilot implements NotificationCenter.NotificationCe
     private void finish(HashMap<SharedConfig.ProxyInfo, Long> results, boolean online, ArrayList<ProxySettings> fresh, int added, boolean urgent) {
         long now = SystemClock.elapsedRealtime();
         HashSet<ProxySettings> freshSet = new HashSet<>(fresh);
+        // In the background (even with "Всегда на связи") Telegram's network answers in bursts and some
+        // checks time out although the proxy works: there only successes count, failures wait for the
+        // next check with the app open
+        boolean trustFailures = online && !ApplicationLoader.mainInterfacePaused;
         SharedConfig.ProxyInfo best = null;
         ArrayList<SharedConfig.ProxyInfo> failedNow = new ArrayList<>();
         ArrayList<SharedConfig.ProxyInfo> workingNow = new ArrayList<>();
@@ -470,7 +494,7 @@ public class TelezhkaProxyAutopilot implements NotificationCenter.NotificationCe
                 if (best == null || ping < best.ping) {
                     best = info;
                 }
-            } else if (online) {
+            } else if (trustFailures) {
                 // Only a failure when other proxies did answer
                 info.availableCheckTime = now;
                 info.available = false;
@@ -508,13 +532,12 @@ public class TelezhkaProxyAutopilot implements NotificationCenter.NotificationCe
                     .putInt(PREF_ADDED, added)
                     .putInt(PREF_REMOVED, removed);
         }
-        if (online) {
-            editor.putInt(PREF_ALIVE, workingNow.size())
-                    .putInt(PREF_ALIVE_TOTAL, SharedConfig.proxyList.size())
-                    .putLong(PREF_ALIVE_TIME, System.currentTimeMillis());
-        }
         editor.apply();
-        if (online && workingNow.size() < getMinAlive()) {
+        int aliveNow = countAlive();
+        if (online) {
+            recordAlive();
+        }
+        if (online && aliveNow < getMinAlive()) {
             // Reserve is low: get fresh proxies now, before the last ones die
             boolean recentFull = lastFullRun != 0 && SystemClock.elapsedRealtime() - lastFullRun < MIN_FULL_GAP_MS;
             schedule(quickRun && !recentFull ? 1000 : LOW_PERIOD_MS);

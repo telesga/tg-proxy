@@ -431,8 +431,14 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
             aliveText.setTextColor(MUTE);
             return;
         }
-        int alive = preferences.getInt(TelezhkaProxyAutopilot.PREF_ALIVE, 0);
-        int total = Math.max(alive, preferences.getInt(TelezhkaProxyAutopilot.PREF_ALIVE_TOTAL, 0));
+        // Same source as the spares list below; the saved number only right after the app started,
+        // before any check in this run
+        int alive = TelezhkaProxyAutopilot.countAlive();
+        int total = SharedConfig.proxyList.size();
+        if (alive == 0) {
+            alive = preferences.getInt(TelezhkaProxyAutopilot.PREF_ALIVE, 0);
+            total = Math.max(alive, preferences.getInt(TelezhkaProxyAutopilot.PREF_ALIVE_TOTAL, 0));
+        }
         int minutes = (int) Math.max(0, (System.currentTimeMillis() - time) / 60000);
         aliveText.setText(formatString(R.string.TelezhkaAliveStatus, alive, total, minutes));
         aliveText.setTextColor(alive < TelezhkaProxyAutopilot.getMinAlive() ? SIGNAL : OK);
