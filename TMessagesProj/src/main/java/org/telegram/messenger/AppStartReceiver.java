@@ -23,6 +23,8 @@ public class AppStartReceiver extends BroadcastReceiver {
                     SharedConfig.saveConfig();
                 }
                 ApplicationLoader.startPushService();
+                // Telezhka: "Всегда на связи" survives a reboot
+                TelezhkaKeepAliveService.startIfEnabled();
             });
         }
     }
