@@ -193,6 +193,11 @@ public class TelezhkaProxyAutopilot implements NotificationCenter.NotificationCe
         if (!isEnabled() || running || TelezhkaProxyRescue.isRunning() || inTrouble || !isConnected()) {
             return;
         }
+        if (ApplicationLoader.mainInterfacePaused && !TelezhkaKeepAliveService.isEnabled()) {
+            // In the background Telegram pauses its network and checks would not get answers;
+            // TelezhkaProxyJob does the background checks with the network woken up
+            return;
+        }
         runCheck(false, false);
     }
 
@@ -455,9 +460,9 @@ public class TelezhkaProxyAutopilot implements NotificationCenter.NotificationCe
         for (Map.Entry<SharedConfig.ProxyInfo, Long> entry : results.entrySet()) {
             SharedConfig.ProxyInfo info = entry.getKey();
             long ping = entry.getValue();
-            info.availableCheckTime = now;
             info.checking = false;
             if (ping > 0) {
+                info.availableCheckTime = now;
                 info.ping = ping;
                 info.available = true;
                 TelezhkaProxyRescue.clearFailures(info.settings);
@@ -465,15 +470,16 @@ public class TelezhkaProxyAutopilot implements NotificationCenter.NotificationCe
                 if (best == null || ping < best.ping) {
                     best = info;
                 }
-            } else {
+            } else if (online) {
+                // Only a failure when other proxies did answer
+                info.availableCheckTime = now;
                 info.available = false;
                 info.ping = 0;
-                if (online) {
-                    // Only count a failure when other proxies did answer: otherwise the network itself is down
-                    TelezhkaProxyRescue.addFailure(info.settings);
-                    failedNow.add(info);
-                }
+                TelezhkaProxyRescue.addFailure(info.settings);
+                failedNow.add(info);
             }
+            // Nobody answered: the network is down or paused (the app is in the background), not the
+            // proxies. Keep what was known, otherwise every spare turns grey while it still works
         }
         int removed = TelezhkaProxyRescue.removeProvenDead();
         if (online) {
