@@ -188,6 +188,7 @@ import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.ui.Components.TelezhkaPopup;
 import org.telegram.messenger.TelezhkaPrivacy;
+import org.telegram.messenger.TelezhkaDeletedCheck;
 import org.telegram.messenger.RichMessageLayout;
 import org.telegram.messenger.RichQuote;
 import org.telegram.messenger.SecretChatHelper;
@@ -916,6 +917,12 @@ public class ChatActivity extends BaseFragment implements
     private SparseArray<ArrayList<MessageObject>> messagesByDaysSorted = new SparseArray<>();
     private LongSparseArray<MessageObject> conversionMessages = new LongSparseArray<>();
     public ArrayList<MessageObject> messages = new ArrayList<>();
+    // Telezhka: after messages load, ask the server which of them were deleted (TelezhkaDeletedCheck)
+    private final Runnable telezhkaDeletedCheck = () -> {
+        if (chatMode == MODE_DEFAULT) {
+            TelezhkaDeletedCheck.check(currentAccount, dialog_id, messages);
+        }
+    };
     private SparseArray<MessageObject> waitingForReplies = new SparseArray<>();
     private LongSparseArray<ArrayList<MessageObject>> polls = new LongSparseArray<>();
     private LongSparseArray<MessageObject.GroupedMessages> groupedMessagesMap = new LongSparseArray<>();
@@ -21343,6 +21350,8 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void didReceivedNotification(int id, int account, final Object... args) {
         if (id == NotificationCenter.messagesDidLoad) {
+            AndroidUtilities.cancelRunOnUIThread(telezhkaDeletedCheck);
+            AndroidUtilities.runOnUIThread(telezhkaDeletedCheck, 1500);
             didReceivedNotification_messagesDidLoad(id, account, args);
         } else {
             didReceivedNotification2(id, account, args);
@@ -30686,6 +30695,8 @@ public class ChatActivity extends BaseFragment implements
     public void onResume() {
         super.onResume();
         checkShowBlur(false);
+        AndroidUtilities.cancelRunOnUIThread(telezhkaDeletedCheck);
+        AndroidUtilities.runOnUIThread(telezhkaDeletedCheck, 1500);
         activityResumeTime = System.currentTimeMillis();
         if (openImport && getSendMessagesHelper().getImportingHistory(dialog_id) != null) {
             ImportingAlert alert = new ImportingAlert(getParentActivity(), null, this, themeDelegate);
@@ -35888,6 +35899,10 @@ public class ChatActivity extends BaseFragment implements
     private void updateVisibleRows(boolean suppressUpdateMessageObject) {
         if (chatListView == null) {
             return;
+        }
+        if (chatMode == MODE_DEFAULT) {
+            // Telezhka: mark "удалено" on messages the server no longer has, however the deletion came
+            TelezhkaDeletedCheck.check(currentAccount, dialog_id, messages);
         }
         int lastVisibleItem = RecyclerView.NO_POSITION;
         int top = 0;

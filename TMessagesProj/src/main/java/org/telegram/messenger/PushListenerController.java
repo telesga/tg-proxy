@@ -107,6 +107,8 @@ public class PushListenerController {
             if (BuildVars.LOGS_ENABLED) {
                 FileLog.d(tag + " POST INIT APP");
             }
+            // Telezhka: if Telegram cannot connect to download this message, find a proxy in the background
+            TelezhkaProxyJob.onPush();
             Utilities.stageQueue.postRunnable(() -> {
                 if (BuildVars.LOGS_ENABLED) {
                     FileLog.d(tag + " START PROCESSING");

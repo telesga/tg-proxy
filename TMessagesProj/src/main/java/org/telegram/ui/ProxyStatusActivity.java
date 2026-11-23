@@ -11,11 +11,15 @@ import static org.telegram.messenger.LocaleController.formatString;
 import static org.telegram.messenger.LocaleController.getString;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.util.TypedValue;
@@ -27,15 +31,18 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.TelezhkaKeepAliveService;
 import org.telegram.messenger.TelezhkaPingMonitor;
 import org.telegram.messenger.TelezhkaProxyAutopilot;
 import org.telegram.messenger.TelezhkaProxyRescue;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
@@ -73,6 +80,11 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
     private LinearLayout lastCard;
     private TextView sourceValue;
     private TextView autopilotStatus;
+    private TextView aliveText;
+    private TextView minAliveValue;
+    private TextView batteryLabel;
+    private TextView batteryInfo;
+    private LinearLayout batteryRow;
     private TextView searchText;
     // Status of the autopilot's own search: refreshed on changes and once a second for the countdown
     private final Runnable searchListener = this::updateSearch;
@@ -261,10 +273,83 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
         autopilotStatus = new TextView(context);
         autopilotStatus.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         autopilotStatus.setTextColor(MUTE);
-        autopilotStatus.setPadding(dp(16), dp(4), dp(16), dp(14));
+        autopilotStatus.setPadding(dp(16), dp(4), dp(16), dp(2));
         autoCard.addView(autopilotStatus);
+        aliveText = new TextView(context);
+        aliveText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        aliveText.setTextColor(MUTE);
+        aliveText.setPadding(dp(16), dp(2), dp(16), dp(14));
+        autoCard.addView(aliveText);
+        autoCard.addView(divider(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 14, 0, 14, 0));
+        // Threshold: look for new proxies while this many still answer
+        LinearLayout minAliveRow = new LinearLayout(context);
+        minAliveRow.setOrientation(LinearLayout.HORIZONTAL);
+        minAliveRow.setGravity(Gravity.CENTER_VERTICAL);
+        minAliveRow.setPadding(dp(16), dp(14), dp(16), dp(14));
+        minAliveRow.setBackground(Theme.createSelectorDrawable(0x14FFFFFF, Theme.RIPPLE_MASK_ALL));
+        TextView minAliveLabel = new TextView(context);
+        minAliveLabel.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        minAliveLabel.setTextColor(TEXT);
+        minAliveLabel.setText(getString(R.string.TelezhkaMinAliveLabel));
+        minAliveRow.addView(minAliveLabel, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+        minAliveValue = new TextView(context);
+        minAliveValue.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        minAliveValue.setTextColor(SIGNAL);
+        minAliveRow.addView(minAliveValue);
+        minAliveRow.setOnClickListener(v -> showMinAliveDialog());
+        autoCard.addView(minAliveRow);
         layout.addView(autoCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         updateAutopilot();
+
+        // Background: battery exemption and "always connected"
+        layout.addView(header(context, getString(R.string.TelezhkaBackgroundTitle)));
+        LinearLayout backgroundCard = card(context);
+        batteryRow = new LinearLayout(context);
+        batteryRow.setOrientation(LinearLayout.VERTICAL);
+        batteryRow.setPadding(dp(16), dp(14), dp(16), dp(14));
+        batteryRow.setBackground(Theme.createSelectorDrawable(0x14FFFFFF, Theme.RIPPLE_MASK_ALL));
+        batteryLabel = new TextView(context);
+        batteryLabel.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        batteryLabel.setTypeface(AndroidUtilities.bold());
+        batteryLabel.setTextColor(SIGNAL);
+        batteryLabel.setText(getString(R.string.TelezhkaBatteryLabel));
+        batteryRow.addView(batteryLabel);
+        batteryInfo = new TextView(context);
+        batteryInfo.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        batteryInfo.setTextColor(MUTE);
+        batteryRow.addView(batteryInfo, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
+        batteryRow.setOnClickListener(v -> askBatteryExemption());
+        backgroundCard.addView(batteryRow);
+        backgroundCard.addView(divider(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 14, 0, 14, 0));
+        LinearLayout keepRow = new LinearLayout(context);
+        keepRow.setOrientation(LinearLayout.HORIZONTAL);
+        keepRow.setGravity(Gravity.CENTER_VERTICAL);
+        keepRow.setPadding(dp(16), dp(14), dp(16), dp(14));
+        LinearLayout keepTexts = new LinearLayout(context);
+        keepTexts.setOrientation(LinearLayout.VERTICAL);
+        TextView keepLabel = new TextView(context);
+        keepLabel.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        keepLabel.setTypeface(AndroidUtilities.bold());
+        keepLabel.setTextColor(TEXT);
+        keepLabel.setText(getString(R.string.TelezhkaKeepAliveLabel));
+        keepTexts.addView(keepLabel);
+        TextView keepInfo = new TextView(context);
+        keepInfo.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        keepInfo.setTextColor(MUTE);
+        keepInfo.setText(getString(R.string.TelezhkaKeepAliveInfo));
+        keepTexts.addView(keepInfo, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
+        keepRow.addView(keepTexts, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, 0, 0, 12, 0));
+        org.telegram.ui.Components.Switch keepSwitch = new org.telegram.ui.Components.Switch(context);
+        keepSwitch.setChecked(TelezhkaKeepAliveService.isEnabled(), false);
+        keepRow.addView(keepSwitch, LayoutHelper.createLinear(37, 40));
+        keepRow.setOnClickListener(v -> {
+            boolean now = !TelezhkaKeepAliveService.isEnabled();
+            TelezhkaKeepAliveService.setEnabled(now);
+            keepSwitch.setChecked(now, true);
+        });
+        backgroundCard.addView(keepRow);
+        layout.addView(backgroundCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        updateBackground();
 
         layout.addView(header(context, getString(R.string.TelezhkaListSourceTitle)));
         LinearLayout sourceCard = card(context);
@@ -317,6 +402,7 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
         if (autopilotStatus == null) {
             return;
         }
+        updateReserve();
         if (!TelezhkaProxyAutopilot.isEnabled()) {
             autopilotStatus.setText(getString(R.string.TelezhkaAutopilotOff));
             return;
@@ -330,6 +416,94 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
         int minutes = (int) Math.max(0, (System.currentTimeMillis() - last) / 60000);
         autopilotStatus.setText(formatString(R.string.TelezhkaAutopilotStatus, minutes,
                 preferences.getInt(TelezhkaProxyAutopilot.PREF_ADDED, 0), preferences.getInt(TelezhkaProxyAutopilot.PREF_REMOVED, 0)));
+    }
+
+    // "Живых прокси: 7 из 12" and the threshold value
+    private void updateReserve() {
+        if (aliveText == null) {
+            return;
+        }
+        minAliveValue.setText(formatString(R.string.TelezhkaMinAliveValue, TelezhkaProxyAutopilot.getMinAlive()));
+        SharedPreferences preferences = MessagesController.getGlobalMainSettings();
+        long time = preferences.getLong(TelezhkaProxyAutopilot.PREF_ALIVE_TIME, 0);
+        if (time == 0 || !TelezhkaProxyAutopilot.isEnabled()) {
+            aliveText.setText(getString(R.string.TelezhkaAliveNever));
+            aliveText.setTextColor(MUTE);
+            return;
+        }
+        // Same source as the spares list below; the saved number only right after the app started,
+        // before any check in this run
+        int alive = TelezhkaProxyAutopilot.countAlive();
+        int total = SharedConfig.proxyList.size();
+        if (alive == 0) {
+            alive = preferences.getInt(TelezhkaProxyAutopilot.PREF_ALIVE, 0);
+            total = Math.max(alive, preferences.getInt(TelezhkaProxyAutopilot.PREF_ALIVE_TOTAL, 0));
+        }
+        int minutes = (int) Math.max(0, (System.currentTimeMillis() - time) / 60000);
+        aliveText.setText(formatString(R.string.TelezhkaAliveStatus, alive, total, minutes));
+        aliveText.setTextColor(alive < TelezhkaProxyAutopilot.getMinAlive() ? SIGNAL : OK);
+    }
+
+    private void showMinAliveDialog() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        int[] choices = TelezhkaProxyAutopilot.MIN_ALIVE_CHOICES;
+        CharSequence[] items = new CharSequence[choices.length];
+        for (int i = 0; i < choices.length; i++) {
+            items[i] = formatString(R.string.TelezhkaMinAliveItem, choices[i]);
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(getString(R.string.TelezhkaMinAliveTitle));
+        builder.setItems(items, (dialog, which) -> {
+            TelezhkaProxyAutopilot.setMinAlive(choices[which]);
+            updateReserve();
+        });
+        showDialog(builder.create());
+    }
+
+    private boolean isBatteryExempt() {
+        try {
+            PowerManager powerManager = (PowerManager) ApplicationLoader.applicationContext.getSystemService(Context.POWER_SERVICE);
+            return powerManager == null || powerManager.isIgnoringBatteryOptimizations(ApplicationLoader.applicationContext.getPackageName());
+        } catch (Throwable e) {
+            return true;
+        }
+    }
+
+    // Shown as an action until Android lets the app work in the background, then as a plain note
+    private void updateBackground() {
+        if (batteryRow == null) {
+            return;
+        }
+        boolean exempt = isBatteryExempt();
+        batteryLabel.setVisibility(exempt ? View.GONE : View.VISIBLE);
+        int infoRes = exempt ? R.string.TelezhkaBatteryAllowed : R.string.TelezhkaBatteryInfo;
+        batteryInfo.setText(getString(infoRes));
+        batteryInfo.setTextColor(exempt ? OK : MUTE);
+        batteryRow.setClickable(!exempt);
+    }
+
+    private void askBatteryExemption() {
+        if (getParentActivity() == null || isBatteryExempt()) {
+            return;
+        }
+        try {
+            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + ApplicationLoader.applicationContext.getPackageName()));
+            getParentActivity().startActivity(intent);
+        } catch (Throwable e) {
+            try {
+                getParentActivity().startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            } catch (Throwable ignore) {
+            }
+        }
+    }
+
+    private View divider(Context context) {
+        View divider = new View(context);
+        divider.setBackgroundColor(LINE);
+        return divider;
     }
 
     private void updateSearch() {
@@ -381,6 +555,7 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
             return;
         }
         updateAutopilot();
+        updateBackground();
         updateHero();
         updateSearch();
         updateLastPick();
@@ -435,16 +610,25 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
                 DateFormat.getTimeFormat(getParentActivity() != null ? getParentActivity() : lastInfo.getContext()).format(new Date(time))));
     }
 
+    // Working spares first, fastest on top; the ones that did not answer (or are not checked yet)
+    // go below a "Не отвечают: N" line, dimmed
     private void updateSpares() {
         sparesList.removeAllViews();
         Context context = sparesList.getContext();
-        ArrayList<SharedConfig.ProxyInfo> spares = new ArrayList<>();
+        ArrayList<SharedConfig.ProxyInfo> working = new ArrayList<>();
+        ArrayList<SharedConfig.ProxyInfo> silent = new ArrayList<>();
         for (SharedConfig.ProxyInfo info : SharedConfig.proxyList) {
-            if (info != SharedConfig.currentProxy || !SharedConfig.isProxyEnabled()) {
-                spares.add(info);
+            if (info == SharedConfig.currentProxy && SharedConfig.isProxyEnabled()) {
+                continue;
+            }
+            if (info.available && info.ping > 0) {
+                working.add(info);
+            } else {
+                silent.add(info);
             }
         }
-        if (spares.isEmpty()) {
+        java.util.Collections.sort(working, (a, b) -> Long.compare(a.ping, b.ping));
+        if (working.isEmpty() && silent.isEmpty()) {
             TextView empty = new TextView(context);
             empty.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             empty.setTextColor(MUTE);
@@ -453,40 +637,57 @@ public class ProxyStatusActivity extends BaseFragment implements NotificationCen
             sparesList.addView(empty);
             return;
         }
-        for (int i = 0; i < spares.size(); i++) {
-            SharedConfig.ProxyInfo info = spares.get(i);
-            LinearLayout row = new LinearLayout(context);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(14), dp(13), dp(14), dp(13));
-            row.setBackground(Theme.createSelectorDrawable(0x14FFFFFF, Theme.RIPPLE_MASK_ALL));
-            PingBarsView bars = new PingBarsView(context, info.available ? info.ping : -1);
-            row.addView(bars, LayoutHelper.createLinear(16, 14, 0, 0, 12, 0));
-            TextView address = new TextView(context);
-            address.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-            address.setTypeface(Typeface.MONOSPACE);
-            address.setTextColor(TEXT);
-            address.setSingleLine(true);
-            address.setEllipsize(TextUtils.TruncateAt.END);
-            address.setText(info.settings.getAddress() + " : " + info.settings.getPort());
-            row.addView(address, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
-            TextView ping = new TextView(context);
-            ping.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-            ping.setTypeface(Typeface.MONOSPACE);
-            ping.setTextColor(MUTE);
-            ping.setText(info.available && info.ping > 0 ? info.ping + " " + getString(R.string.TelezhkaMs) : "—");
-            row.addView(ping, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 8, 0, 0, 0));
-            row.setOnClickListener(v -> switchTo(info));
-            row.setAlpha(0f);
-            row.setTranslationY(dp(8));
-            row.animate().alpha(1f).translationY(0).setStartDelay(40L * i).setDuration(300).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
-            sparesList.addView(row);
-            if (i < spares.size() - 1) {
-                View divider = new View(context);
-                divider.setBackgroundColor(LINE);
-                sparesList.addView(divider, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 14, 0, 14, 0));
+        int index = 0;
+        for (int i = 0; i < working.size(); i++) {
+            if (i > 0) {
+                sparesList.addView(divider(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 14, 0, 14, 0));
+            }
+            addSpareRow(context, working.get(i), index++, false);
+        }
+        if (!silent.isEmpty()) {
+            if (!working.isEmpty()) {
+                sparesList.addView(divider(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 14, 0, 14, 0));
+            }
+            TextView silentHeader = new TextView(context);
+            silentHeader.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            silentHeader.setTypeface(AndroidUtilities.bold());
+            silentHeader.setTextColor(MUTE);
+            silentHeader.setPadding(dp(16), dp(12), dp(16), dp(4));
+            silentHeader.setText(formatString(R.string.TelezhkaConnectionSilent, silent.size()));
+            sparesList.addView(silentHeader);
+            for (int i = 0; i < silent.size(); i++) {
+                addSpareRow(context, silent.get(i), index++, true);
             }
         }
+    }
+
+    private void addSpareRow(Context context, SharedConfig.ProxyInfo info, int index, boolean dimmed) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14), dimmed ? dp(9) : dp(13), dp(14), dimmed ? dp(9) : dp(13));
+        row.setBackground(Theme.createSelectorDrawable(0x14FFFFFF, Theme.RIPPLE_MASK_ALL));
+        PingBarsView bars = new PingBarsView(context, info.available ? info.ping : -1);
+        row.addView(bars, LayoutHelper.createLinear(16, 14, 0, 0, 12, 0));
+        TextView address = new TextView(context);
+        address.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        address.setTypeface(Typeface.MONOSPACE);
+        address.setTextColor(dimmed ? MUTE : TEXT);
+        address.setSingleLine(true);
+        address.setEllipsize(TextUtils.TruncateAt.END);
+        address.setText(info.settings.getAddress() + " : " + info.settings.getPort());
+        row.addView(address, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+        TextView ping = new TextView(context);
+        ping.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        ping.setTypeface(Typeface.MONOSPACE);
+        ping.setTextColor(MUTE);
+        ping.setText(!dimmed ? info.ping + " " + getString(R.string.TelezhkaMs) : "—");
+        row.addView(ping, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 8, 0, 0, 0));
+        row.setOnClickListener(v -> switchTo(info));
+        row.setAlpha(0f);
+        row.setTranslationY(dp(8));
+        row.animate().alpha(dimmed ? 0.5f : 1f).translationY(0).setStartDelay(40L * Math.min(index, 12)).setDuration(300).setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+        sparesList.addView(row);
     }
 
     private void switchTo(SharedConfig.ProxyInfo info) {

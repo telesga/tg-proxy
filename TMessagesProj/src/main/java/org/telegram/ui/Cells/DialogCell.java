@@ -82,6 +82,7 @@ import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.TelezhkaPrivacy;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
@@ -2134,6 +2135,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 timeString = LocaleController.stringForMessageListDate(lastMessageDate);
             } else if (message != null) {
                 timeString = LocaleController.stringForMessageListDate(message.messageOwner.date);
+            }
+            if (TextUtils.isEmpty(customMessage) && draftMessage == null && message != null
+                    && TelezhkaPrivacy.isDeleted(currentAccount, message)) {
+                timeString = getString(R.string.TelezhkaDeletedMark) + " " + timeString;  // Telezhka: the last message was deleted by the other side
             }
 
             if (message == null || isSavedDialog) {
